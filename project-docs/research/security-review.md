@@ -1,4 +1,4 @@
-# Security review (R4, dev-system:security-reviewer, about 13:05 EST)
+# Security review (R4, dev-system:security-reviewer, 13:04 EST)
 
 The reviewer is read-only, so the tech lead saved its report here.
 **Verdict: FAIL.** This is a static, source-only review: nothing was run, so the exploits are not yet replayed against a live server.

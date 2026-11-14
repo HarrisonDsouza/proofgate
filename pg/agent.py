@@ -32,7 +32,7 @@ def triage(case: dict, clauses: list[dict]) -> dict:
             "cited_clauses": [clause] if clause else []}
 
 
-@traceable("executor.execute_one")  # LangSmith trace when LANGSMITH_TRACING=true; no-op otherwise
+# Not traced: the result carries grant_id, a single-use bearer token that must not leave our process.
 def execute_one(tenant: str, proposal: dict) -> dict:
     res = gate.execute(tenant, proposal["proposal_id"], proposal["approval_id"], AGENT_ID, OPERATOR_ID)
     if res["decision"] != "ALLOW":

@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pause, Play, UserX } from 'lucide-react'
+import { Bot, Pause, Play, UserX } from 'lucide-react'
 import { useState } from 'react'
 import { api, ruleName, secs, type Policy } from '../api'
-import { Notice, Title, useDashboard, type Tone } from '../ui'
+import { Notice, Spin, Title, useDashboard, type Tone } from '../ui'
 import { errText } from './Review'
 
 const REVIEWERS = ['dr-demo', 'dr-stamper', 'dr-skim', 'dr-cardio', 'dr-expired', 'vol-1', 'vol-2', 'vol-3']
@@ -69,6 +69,21 @@ export default function Supervisor() {
       return { tone: 'info', head: r.paused ? 'Agent paused' : 'Agent running', lines: [r.paused ? 'The executor requests no grants until resumed.' : 'The executor picks up approved proposals again.'] }
     })
 
+  type Triaged = { case_id: string; recommendation: string; proposer: string; cited: string[]; clause: string[]; rationale: string; fallback_reason: string | null; trace: string[] }
+  const triageNew = () =>
+    act('triage', async () => {
+      const r = await api<{ voyage_key_set: boolean; claims: Triaged[] }>('/api/agent/triage-new', { n: 3 })
+      const llm = r.claims.filter((c) => c.proposer.startsWith('graph:')).length
+      return {
+        tone: 'info',
+        head: `${r.claims.length} new claims triaged by the LangGraph agent: ${llm} decided with Voyage + Atlas Vector Search, ${r.claims.length - llm} by the fallback rule`,
+        lines: [
+          ...r.claims.map((c) => `${c.case_id}: ${c.recommendation.toUpperCase()} citing ${c.cited.join(', ')} under ${c.clause.join(', ')} [${c.proposer}]. ${c.rationale}${c.fallback_reason ? ` (fallback: ${c.fallback_reason})` : ''}`),
+          'These are proposals only. Each waits in the review queue; a reviewer must read every cited document and the Atlas gate decides.',
+        ],
+      }
+    })
+
   const d = dash.data
   const burst = d?.last_burst
 
@@ -79,6 +94,7 @@ export default function Supervisor() {
 
       <div className="ledger-grid">
         <section>
+          {policies.isLoading && <p className="empty"><Spin /> Loading the policy from Atlas…</p>}
           <h2 className="section">Review policy {active && <span className="tag proof" style={{ marginLeft: 6 }}>v{active.version} in force</span>}</h2>
           <dl className="kv">
             {Object.entries(active?.rules ?? {}).map(([k, v]) => (
@@ -100,7 +116,7 @@ export default function Supervisor() {
               <input type="number" min={curFloorS + 1} max={600} step={1} inputMode="numeric" value={floorS} onChange={(e) => setFloorS(e.target.value)} placeholder={`more than ${curFloorS}`} />
             </label>
             <button className="btn ink" disabled={!floorS || !!busy}>
-              Publish v{(active?.version ?? 0) + 1}
+              {busy === 'floor' && <Spin />}Publish v{(active?.version ?? 0) + 1}
             </button>
           </form>
         </section>
@@ -117,8 +133,18 @@ export default function Supervisor() {
               </select>
             </label>
             <button className="btn redline" onClick={halt} disabled={!!busy} style={{ alignSelf: 'flex-end' }}>
-              <UserX aria-hidden />
+              {busy === 'halt' ? <Spin /> : <UserX aria-hidden />}
               Suspend
+            </button>
+          </div>
+          <div className="ctl">
+            <div className="what">
+              <b>Triage agent</b>
+              <span>LangGraph agent on 3 new claims: Atlas Vector Search + Voyage rerank pick the clause and decide; code checks the citations</span>
+            </div>
+            <button className="btn" onClick={triageNew} disabled={!!busy}>
+              {busy === 'triage' ? <Spin /> : <Bot aria-hidden />}
+              Run agent on new claims
             </button>
           </div>
           <div className="ctl">
@@ -127,7 +153,7 @@ export default function Supervisor() {
               <span>{paused === null ? 'Running unless paused here' : paused ? 'Paused: no grants requested' : 'Running'}</span>
             </div>
             <button className="btn" onClick={togglePause} disabled={!!busy}>
-              {paused ? <Play aria-hidden /> : <Pause aria-hidden />}
+              {busy === 'pause' ? <Spin /> : paused ? <Play aria-hidden /> : <Pause aria-hidden />}
               {paused ? 'Resume agent' : 'Pause agent'}
             </button>
           </div>

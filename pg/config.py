@@ -13,9 +13,9 @@ class Settings:
     console_key: str = os.getenv("CONSOLE_KEY", "")
     debug_hooks: bool = os.getenv("DEMO_DEBUG_HOOKS", "false").lower() == "true"
     run_background: bool = os.getenv("RUN_BACKGROUND", "1") == "1"  # detector + compensation worker threads
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")
-    llm_model: str = os.getenv("LLM_MODEL", "")
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    voyage_api_key: str = os.getenv("VOYAGE_API_KEY", "")
+    voyage_embed_model: str = os.getenv("VOYAGE_EMBED_MODEL", "voyage-3.5")
+    voyage_rerank_model: str = os.getenv("VOYAGE_RERANK_MODEL", "rerank-2.5")
     elevenlabs_api_key: str = os.getenv("ELEVENLABS_API_KEY", "")
 
 

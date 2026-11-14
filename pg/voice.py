@@ -14,12 +14,14 @@ import secrets
 import time
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from pymongo.errors import DuplicateKeyError
 
 from pg import attest_score, review
 from pg import observability as obs
+from pg.auth import console_only
 from pg.config import settings
 from pg.db import get_db, now
 
@@ -132,38 +134,65 @@ def status():
     return {"configured": configured(), "stt_models": list(STT_MODELS), "tts_model": TTS_MODEL}
 
 
-@router.post("/api/voice/attest", status_code=201)
-async def attest(request: Request, x_tenant_id: str = Header(...), x_session_id: str = Header(...),
-                 x_case_id: str = Header(...), x_fallback_text: str | None = Header(None)):
-    """Body: raw audio bytes (MediaRecorder webm/opus). On any voice failure the reviewer's typed text is
-    stored instead (source='typed_fallback'); the approval flow never depends on ElevenLabs."""
-    audio = await request.body()
-    if len(audio) > MAX_AUDIO_BYTES:
-        raise HTTPException(413, "audio too large")
+def _validate(db, tenant: str, session_id: str, case_id: str) -> None:
+    """Cheap checks BEFORE any ElevenLabs call, so nobody can spend STT credit with a bogus session or case."""
+    if not db.reviewer_sessions.find_one({"tenant_id": tenant, "session_id": session_id}, {"_id": 1}):
+        raise HTTPException(404, "unknown session")
+    if not db.cases.find_one({"tenant_id": tenant, "case_id": case_id}, {"_id": 1}):
+        raise HTTPException(404, "unknown case")
+
+
+def _attest_sync(tenant: str, session_id: str, case_id: str, audio: bytes, content_type: str, fallback: str | None) -> dict:
     db = get_db()
+    _validate(db, tenant, session_id, case_id)
     sha = hashlib.sha256(audio).hexdigest() if audio else None
     try:
         if not audio:
             raise VoiceUnavailable("empty audio")
-        r = transcribe(audio, request.headers.get("content-type", "audio/webm"))
+        r = transcribe(audio, content_type)
         if not r["text"]:
             raise VoiceUnavailable("empty transcript")
-        doc = record_attestation(db, x_tenant_id, x_session_id, x_case_id, r["text"], "elevenlabs_stt", sha,
-                                 r["audio_seconds"], r["model"])
+        return record_attestation(db, tenant, session_id, case_id, r["text"], "elevenlabs_stt", sha, r["audio_seconds"], r["model"])
     except VoiceUnavailable as e:
-        if not x_fallback_text:
+        if not fallback:
             raise HTTPException(503, f"voice unavailable ({e}); type the attestation instead") from e
         obs.log_event("voice_fallback", reason=str(e))
-        doc = record_attestation(db, x_tenant_id, x_session_id, x_case_id, x_fallback_text, "typed_fallback", sha, None, None)
-    return doc
+        return record_attestation(db, tenant, session_id, case_id, fallback, "typed_fallback", sha, None, None)
 
 
-@router.get("/api/voice/receipt/{case_id}")
+async def _read_bounded(request: Request) -> bytes:
+    """Reject on Content-Length first, then enforce the cap while streaming (a chunked body has no Content-Length)."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_AUDIO_BYTES:
+        raise HTTPException(413, "audio too large")
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf += chunk
+        if len(buf) > MAX_AUDIO_BYTES:
+            raise HTTPException(413, "audio too large")
+    return bytes(buf)
+
+
+@router.post("/api/voice/attest", status_code=201, dependencies=[Depends(console_only)])
+async def attest(request: Request, x_tenant_id: str = Header(...), x_session_id: str = Header(...),
+                 x_case_id: str = Header(...), x_fallback_text: str | None = Header(None)):
+    """Body: raw audio bytes (MediaRecorder webm/opus). On any voice failure the reviewer's typed text is
+    stored instead (source='typed_fallback'); the approval flow never depends on ElevenLabs.
+
+    The blocking work (Mongo, ElevenLabs) runs in the threadpool: a slow Scribe call must not stall the event loop,
+    because every reviewer's heartbeat is served by it and a stalled heartbeat is lost dwell."""
+    audio = await _read_bounded(request)
+    return await run_in_threadpool(_attest_sync, x_tenant_id, x_session_id, x_case_id, audio,
+                                   request.headers.get("content-type", "audio/webm"), x_fallback_text)
+
+
+@router.get("/api/voice/receipt/{case_id}", dependencies=[Depends(console_only)])
 def receipt(case_id: str, x_tenant_id: str = Header(...)):
     """Spoken audit receipt: the examiner hears the case's chain of custody in about 15 seconds."""
     from pg import rules
-    ex = rules.examiner(x_tenant_id, case_id)
-    text = receipt_text(ex)
+    if not get_db().cases.find_one({"tenant_id": x_tenant_id, "case_id": case_id}, {"_id": 1}):
+        raise HTTPException(404, "unknown case")  # before any TTS spend
+    text = receipt_text(rules.examiner(x_tenant_id, case_id))
     try:
         audio = synthesize(text)
     except VoiceUnavailable as e:

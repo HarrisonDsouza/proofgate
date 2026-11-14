@@ -5,7 +5,6 @@ Follows the PRD Section 8 contract. Run: uvicorn pg.main:app --port 8080
 from __future__ import annotations
 
 import json
-import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from pg import agent, config, gate, review, rules, target, voice
+from pg.auth import console_only, same
 from pg.config import settings
 from pg.db import get_db
 
@@ -43,8 +43,7 @@ def clean(x):
     return json.loads(json.dumps(x, default=str))
 
 
-def _same(given: str | None, expected: str) -> bool:
-    return bool(expected) and secrets.compare_digest((given or "").encode(), expected.encode())
+_same = same
 
 
 def agent_only(x_service_identity: str | None, x_service_key: str | None):
@@ -55,12 +54,6 @@ def agent_only(x_service_identity: str | None, x_service_key: str | None):
 @app.exception_handler(review.BadRequest)
 async def br(_, e):
     return JSONResponse({"error": str(e)}, status_code=400)
-
-
-def console_only(x_console_key: str | None = Header(None)):
-    """Operator console key for sessions and the control plane. Without it: 401, nothing is read or written."""
-    if not _same(x_console_key, settings.console_key):
-        raise HTTPException(401, "console key required")
 
 
 @app.exception_handler(review.NotFound)

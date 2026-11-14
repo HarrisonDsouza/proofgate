@@ -16,6 +16,7 @@ class Settings:
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")
     llm_model: str = os.getenv("LLM_MODEL", "")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    elevenlabs_api_key: str = os.getenv("ELEVENLABS_API_KEY", "")
 
 
 settings = Settings()

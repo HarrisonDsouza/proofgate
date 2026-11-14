@@ -16,11 +16,11 @@ def world(*, status="submitted", suspended=False, paused=False, expired=False, s
           viewed=("E1", "E3"), dwell=40000, item_ms=20000, window=1, age_h=1, reviewer_id="dr-demo", changed_hash=False):
     case = {"case_id": "C1", "specialty": "orthopedics",
             "evidence": [{"evidence_id": e, "hash": ("c" * 64 if (changed_hash and e == "E1") else h)} for e, h in H.items()]}
-    proposal = {"proposal_id": "P1", "case_id": "C1", "operator_id": "op-ops-1", "agent_id": "triage-agent-v1",
+    proposal = {"proposal_id": "P1", "case_id": "C1", "status": "approved", "approval_id": "AP1", "operator_id": "op-ops-1", "agent_id": "triage-agent-v1",
                 "cited_evidence": [{"evidence_id": e, "hash": h} for e, h in H.items()], "created_at": NOW - timedelta(hours=age_h)}
     reviewer = {"reviewer_id": reviewer_id, "license_no": "L1", "specialty": specialty,
                 "license_expires_at": NOW - timedelta(days=1) if expired else NOW + timedelta(days=300)}
-    approval = {"tenant_id": "t", "case_id": "C1", "proposal_id": "P1", "status": status, "reviewer_id": reviewer_id,
+    approval = {"tenant_id": "t", "approval_id": "AP1", "case_id": "C1", "proposal_id": "P1", "status": status, "reviewer_id": reviewer_id,
                 "credential_snapshot": {"license_no": "L1", "specialty": specialty},
                 "views": [{"evidence_id": e, "active_ms": item_ms} for e in viewed],
                 "evidence_hashes_viewed": [H[e] for e in viewed], "active_dwell_ms": dwell}
@@ -89,3 +89,24 @@ def test_credited_time_never_exceeds_wall_clock(beats):
         total += gap
         t = nxt
     assert credited <= total * 1000 + 1
+
+
+def test_policy_validator_allows_only_tightening_of_known_int_keys():
+    import pytest
+
+    from pg.gate import PolicyRejected, validate_policy_change
+    cur = {"min_active_dwell_ms": 30000, "rate_max_approvals": 10, "max_proposal_age_ms": 86400000}
+    assert validate_policy_change(cur, {"min_active_dwell_ms": 60000, "rate_max_approvals": 5}) == {"min_active_dwell_ms": 60000, "rate_max_approvals": 5}
+    for bad in ({"min_active_dwell_ms": 1000},                 # loosens a floor
+                {"rate_max_approvals": 500},                    # loosens a cap
+                {"max_proposal_age_ms": 10 ** 12},              # loosens an age and exceeds the range
+                {"baseline_only_existence": True},              # switches the gate off
+                {"require_specialty_match": False},
+                {"median_n": 1},
+                {"min_active_dwell_ms": "60000"},               # wrong type
+                {"min_active_dwell_ms": 60000.5},
+                {"min_active_dwell_ms": True},                  # bool is not an int here
+                {"min_active_dwell_ms": 0},
+                {}, [], None):
+        with pytest.raises(PolicyRejected):
+            validate_policy_change(cur, bad)

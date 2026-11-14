@@ -170,7 +170,6 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
         with client().start_session() as s:
             out = s.with_transaction(body, read_concern=ReadConcern("snapshot"), write_concern=WriteConcern("majority"))
     out["txn_attempts"] = attempts["n"]
-    db.gate_decisions.update_one({"decision_id": out["gate_decision_id"]}, {"$set": {"txn_attempts": attempts["n"]}})
     obs.DECISIONS.labels(out["decision"], "agent").inc()
     obs.OPERATE_LATENCY.observe(tm["ms"] / 1000)
     if attempts["n"] > 1:
@@ -185,7 +184,7 @@ def confirm(tenant: str, denial_id: str) -> dict:
     db = get_db()
     d = db.denials.find_one({"tenant_id": tenant, "denial_id": denial_id})
     pol = db.review_policies.find_one({"tenant_id": tenant, "policy_id": d["policy_id"], "version": d["policy_version"]})
-    rec = db.target_records.find_one({"tenant_id": tenant, "record_id": d["record_id"]})
+    rec = db.target_records.find_one({"tenant_id": tenant, "kind": pol["effect"]["kind"], "record_id": d["record_id"]})
     ok = rec and rec.get("status") == pol["effect"]["apply_status"] and rec.get("last_apply", {}).get("grant_id") == d["grant_id"]
     status = "CONFIRMED" if ok else "NOT_EXECUTED"
     t = now()

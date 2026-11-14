@@ -2,21 +2,21 @@
 from __future__ import annotations
 
 import hashlib
-import json
 
 from pg.db import get_db
+from pg.review import chain_body
 
 
 def _r(violations: list) -> dict:
     return {"pass": not violations, "violations": violations[:20], "count": len(violations)}
 
 
-def verify_session_chain(db, tenant: str, session_id: str) -> bool:
+def verify_session_chain(db, tenant: str, session_id: str, first_bad_seq: bool = False):
+    """True if intact. With first_bad_seq, returns the seq of the first broken event instead of False. O(E), O(1) memory."""
     prev = "0" * 64
     for ev in db.review_events.find({"tenant_id": tenant, "session_id": session_id}).sort("seq", 1):
-        body = json.dumps({k: ev.get(k) for k in ("session_id", "seq", "case_id", "evidence_id", "type", "credited_ms")}, sort_keys=True)
-        if ev.get("prev_hash") != prev or ev.get("hash") != hashlib.sha256((prev + body).encode()).hexdigest():
-            return False
+        if ev.get("prev_hash") != prev or ev.get("hash") != hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest():
+            return first_bad_seq and ev["seq"] or False
         prev = ev["hash"]
     return True
 

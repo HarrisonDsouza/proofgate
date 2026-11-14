@@ -176,6 +176,13 @@ def examiner(case_id: str, x_tenant_id: str = Header(...)):
     return clean(rules.examiner(x_tenant_id, case_id))
 
 
+@app.get("/api/verify/chain/{session_id}")
+def verify_chain(session_id: str, x_tenant_id: str = Header(...)):
+    """Examiner check: is the review-event hash chain intact? Returns the first broken seq if not."""
+    bad = rules.verify_session_chain(get_db(), x_tenant_id, session_id, first_bad_seq=True)
+    return {"session_id": session_id, "intact": bad is True, "first_broken_seq": None if bad is True else bad}
+
+
 @app.get("/rules")
 def rules_route(tenant: str):
     return rules.run_rules(tenant)

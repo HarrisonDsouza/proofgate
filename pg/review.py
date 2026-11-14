@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from pg.checks import credit_heartbeat
 from pg.db import client, get_db, now
@@ -22,19 +22,37 @@ def _rid(prefix: str) -> str:
     return f"{prefix}-{secrets.token_hex(4)}"
 
 
+def chain_body(ev: dict) -> str:
+    """Canonical text that is hashed. Includes ts (ms), so event times cannot be edited without detection."""
+    ts = ev["ts"].astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+    return json.dumps({**{k: ev.get(k) for k in ("session_id", "seq", "case_id", "evidence_id", "type", "credited_ms")}, "ts": ts},
+                      sort_keys=True)
+
+
 def _event(db, tenant: str, session_id: str, reviewer_id: str, case_id: str, typ: str, credited_ms: int = 0,
            evidence_id: str | None = None, s=None) -> None:
-    """Append a review_event, hash-chained per session (S3)."""
-    sess = db.reviewer_sessions.find_one_and_update({"tenant_id": tenant, "session_id": session_id},
-                                                    {"$inc": {"seq": 1}}, return_document=True, session=s)
-    prev = sess.get("chain_head", "0" * 64)
-    ev = {"tenant_id": tenant, "session_id": session_id, "seq": sess["seq"], "reviewer_id": reviewer_id,
-          "case_id": case_id, "evidence_id": evidence_id, "type": typ, "ts": now(), "credited_ms": int(credited_ms)}
-    body = json.dumps({k: ev[k] for k in ("session_id", "seq", "case_id", "evidence_id", "type", "credited_ms")}, sort_keys=True)
-    ev["prev_hash"] = prev
-    ev["hash"] = hashlib.sha256((prev + body).encode()).hexdigest()
-    db.review_events.insert_one(ev, session=s)
-    db.reviewer_sessions.update_one({"_id": sess["_id"]}, {"$set": {"chain_head": ev["hash"]}}, session=s)
+    """Append a review_event, hash-chained per session (S3).
+
+    Atomic: the read of chain_head, the insert and the head update commit together, so two concurrent events on
+    one session conflict on the session document and one retries; the chain cannot fork (it did before this fix)."""
+    def body(ss):
+        sess = db.reviewer_sessions.find_one_and_update({"tenant_id": tenant, "session_id": session_id},
+                                                        {"$inc": {"seq": 1}}, return_document=True, session=ss)
+        prev = sess.get("chain_head", "0" * 64)
+        t = now()
+        ev = {"tenant_id": tenant, "session_id": session_id, "seq": sess["seq"], "reviewer_id": reviewer_id,
+              "case_id": case_id, "evidence_id": evidence_id, "type": typ, "credited_ms": int(credited_ms),
+              "ts": t.replace(microsecond=t.microsecond // 1000 * 1000)}  # BSON dates are ms: hash what is stored
+        ev["prev_hash"] = prev
+        ev["hash"] = hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest()
+        db.review_events.insert_one(ev, session=ss)
+        db.reviewer_sessions.update_one({"_id": sess["_id"]}, {"$set": {"chain_head": ev["hash"]}}, session=ss)
+
+    if s is not None:  # already inside the caller's transaction
+        body(s)
+    else:
+        with client().start_session() as ss:
+            ss.with_transaction(body)
 
 
 def open_session(tenant: str, reviewer_id: str) -> dict:

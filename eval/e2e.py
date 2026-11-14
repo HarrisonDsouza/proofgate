@@ -66,6 +66,9 @@ def main() -> int:
     check(rec.get("status") == "DENIED", f"claims system record is {rec.get('status')}")
     rules = c.get("/rules", params={"tenant": T}).json()
     check(all(v["pass"] for v in rules.values()), "rules R1-R8 all pass after the honest denial")
+    if "--no-halt" in sys.argv:
+        print(f"{'ALL PASS' if ok else 'SOME CHECKS FAILED'}: {p['case_id']} left executed for the examiner (no halt)")
+        return 0 if ok else 1
 
     h = c.post("/api/suspensions", json={"reviewer_id": REVIEWER, "reason": "SUPERVISOR_HALT"}).raise_for_status().json()
     check(h.get("compensations_created", 0) >= 1, f"halt: {h.get('grants_revoked')} grants revoked, "

@@ -13,9 +13,9 @@ import math
 import statistics
 import threading
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from pymongo.errors import OperationFailure
+from pymongo.errors import DuplicateKeyError, OperationFailure, PyMongoError
 
 from pg import gate
 from pg import observability as obs
@@ -62,17 +62,22 @@ def _rate_and_median(db, tenant: str, reviewer_id: str, policy: dict) -> tuple[s
     return None
 
 
+def _history(db, tenant: str, reviewer_id: str):
+    """The reviewer's approvals oldest-first, streamed from the (tenant, reviewer, created_at) index: O(N) time, O(1) memory.
+    The CUSUM baseline is the reviewer's FIRST approvals, so a rebuild must start at the beginning, not at a recent window."""
+    return db.approvals.find({"tenant_id": tenant, "reviewer_id": reviewer_id},
+                             {"active_dwell_ms": 1, "created_at": 1, "approval_id": 1}).sort("created_at", 1)
+
+
 def check_reviewer(db, tenant: str, reviewer_id: str, policy: dict) -> tuple[str, dict] | None:
-    """BATCH check: replays the reviewer's last 200 approvals. O(W). Used for catch-up after downtime and as the
-    reference the streaming detector is tested against. The per-event path is `check_streaming` (O(1))."""
+    """BATCH check: replays the reviewer's whole history. O(N). Used for catch-up after downtime and as the reference
+    the streaming detector is tested against. The per-event path is `check_streaming` (O(1))."""
     hit = _rate_and_median(db, tenant, reviewer_id, policy)
     if hit:
         return hit
     c = cusum_for(policy)
     if c is not None:
-        recent = list(db.approvals.find({"tenant_id": tenant, "reviewer_id": reviewer_id},
-                                        {"active_dwell_ms": 1, "created_at": 1}).sort("created_at", -1).limit(200))
-        dwells = [_scaled(policy, a["active_dwell_ms"]) for a in reversed(recent)]
+        dwells = [_scaled(policy, a["active_dwell_ms"]) for a in _history(db, tenant, reviewer_id)]
         at = c.run(dwells)
         if at is not None:
             return "CUSUM", {"approvals_seen": len(dwells), "alarm_at": at, "h": c.h,
@@ -95,24 +100,34 @@ def check_streaming(db, tenant: str, reviewer_id: str, ap: dict, policy: dict) -
     if not isinstance(c, SelfCusum):  # population mode is the trade-off analysis only; use the batch path
         return check_reviewer(db, tenant, reviewer_id, policy)
     sid = f"{tenant}|{reviewer_id}"
-    doc = db.reviewer_stats.find_one({"_id": sid})
-    if doc is None:
-        state, last = SelfCusumState(c.sigma, c.drop, c.h, c.warmup), (None, None)
-        for a in reversed(list(db.approvals.find({"tenant_id": tenant, "reviewer_id": reviewer_id},
-                                                 {"active_dwell_ms": 1, "created_at": 1, "approval_id": 1})
-                               .sort("created_at", -1).limit(200))):
-            state.push(_scaled(policy, a["active_dwell_ms"]))
-            last = (a["created_at"], a["approval_id"])
-    else:
-        state = SelfCusumState.from_doc(doc, c.sigma, c.drop, c.h, c.warmup)
-        last = (doc.get("last_created_at"), doc.get("last_approval_id"))
-        if last[0] is not None and (ap["created_at"], ap["approval_id"]) <= last:
-            return ("CUSUM", {"approvals_seen": state.n, "alarm_at": state.alarm_at, "h": c.h, "mode": "self"}) \
-                if state.alarm_at is not None else None  # already counted (restart replay)
-        state.push(_scaled(policy, ap["active_dwell_ms"]))
-        last = (ap["created_at"], ap["approval_id"])
-    db.reviewer_stats.update_one({"_id": sid}, {"$set": {**state.to_doc(), "tenant_id": tenant, "reviewer_id": reviewer_id,
-                                                           "last_created_at": last[0], "last_approval_id": last[1]}}, upsert=True)
+    for _ in range(6):  # optimistic: if another detector wrote first, re-read and redo (no lost or backwards update)
+        doc = db.reviewer_stats.find_one({"_id": sid})
+        if doc is None:
+            state, last = SelfCusumState(c.sigma, c.drop, c.h, c.warmup), (None, None)
+            for a in _history(db, tenant, reviewer_id):
+                state.push(_scaled(policy, a["active_dwell_ms"]))
+                key = (a["created_at"], a["approval_id"])
+                last = key if last[0] is None or key > last else last  # MAX, not last-seen: approvals tied on the same
+                # millisecond arrive in arbitrary order, and the replay guard compares against this exact key
+            fresh = {**state.to_doc(), "tenant_id": tenant, "reviewer_id": reviewer_id,
+                     "last_created_at": last[0], "last_approval_id": last[1], "ver": 1}
+            try:
+                db.reviewer_stats.insert_one({"_id": sid, **fresh})
+            except DuplicateKeyError:
+                continue
+        else:
+            state = SelfCusumState.from_doc(doc, c.sigma, c.drop, c.h, c.warmup)
+            last = (doc.get("last_created_at"), doc.get("last_approval_id"))
+            if last[0] is not None and (ap["created_at"], ap["approval_id"]) <= last:
+                break  # already counted (restart replay)
+            state.push(_scaled(policy, ap["active_dwell_ms"]))
+            r = db.reviewer_stats.update_one(
+                {"_id": sid, "ver": doc.get("ver", 1)},
+                {"$set": {**state.to_doc(), "last_created_at": ap["created_at"], "last_approval_id": ap["approval_id"]},
+                 "$inc": {"ver": 1}})
+            if r.matched_count == 0:
+                continue
+        break
     if state.alarm_at is not None:
         return "CUSUM", {"approvals_seen": state.n, "alarm_at": state.alarm_at, "h": c.h, "mode": "self"}
     return None
@@ -173,7 +188,7 @@ def catch_up(db, since) -> int:
         action = prop.get("action_type", "claim_denial")
         policy = gate.active_policy(db, tenant, action)
         hit = check_reviewer(db, tenant, rid, policy)
-        db.reviewer_stats.delete_one({"_id": f"{tenant}|{rid}"})  # rebuilt from history on the next event
+        db.reviewer_stats.delete_one({"_id": f"{tenant}|{rid}"})  # rebuilt from the full history on the next event
         if hit:
             gate.suspend(tenant, rid, "detector_catchup", hit[0], hit[1], action)
             obs.CLOSER_EVENTS.labels(f"suspend_{hit[0].lower()}").inc()
@@ -181,16 +196,42 @@ def catch_up(db, since) -> int:
     return suspended
 
 
-def run(stop: threading.Event | None = None) -> None:
-    db = get_db()
+def _since(db) -> "datetime":
+    """Where a catch-up scan starts: the newest approval the detector handled (its created_at, not the detector's
+    wall clock, so detector lag cannot under-scan the gap), minus a minute of slack for clock skew."""
     st = db.detector_state.find_one({"_id": STATE_ID}) or {}
-    since = st.get("last_event_at") or (now() - timedelta(minutes=CATCHUP_DEFAULT_MIN))
-    kw: dict = {}
-    if st.get("resume_token"):
-        kw["resume_after"] = st["resume_token"]
+    base = st.get("last_created_at") or (now() - timedelta(minutes=CATCHUP_DEFAULT_MIN))
+    return base - timedelta(minutes=1)
+
+
+def _cluster_time(db):
+    try:
+        return db.client.admin.command("ping").get("$clusterTime", {}).get("clusterTime")
+    except PyMongoError:
+        return None
+
+
+MAX_EVENT_FAILURES = 5
+
+
+def run(stop: threading.Event | None = None) -> None:
+    """Watch approvals forever. Survives transient errors (reconnects, timeouts) by resuming from the last saved token;
+    a poison event that fails MAX_EVENT_FAILURES times is logged and skipped so it cannot wedge the detector."""
+    db = get_db()
+    failures = 0
     while not (stop and stop.is_set()):
-        n = 0 if kw else catch_up(db, since)  # a resume token already guarantees no gap; catch up only without one
-        obs.log_event("detector_start", resumed=bool(kw), catch_up_suspensions=n)
+        st = db.detector_state.find_one({"_id": STATE_ID}) or {}
+        kw: dict = {}
+        if st.get("resume_token"):
+            kw["resume_after"] = st["resume_token"]
+        else:
+            # No token: note the cluster time FIRST, scan the gap, then watch from that exact time, so an approval
+            # written between the scan and the watch is still delivered.
+            ts = _cluster_time(db)
+            n = catch_up(db, _since(db))
+            if ts is not None:
+                kw["start_at_operation_time"] = ts
+            obs.log_event("detector_start", resumed=False, catch_up_suspensions=n)
         try:
             with db.watch(PIPELINE, **kw) as cs:
                 while not (stop and stop.is_set()):
@@ -198,23 +239,35 @@ def run(stop: threading.Event | None = None) -> None:
                     if ch is None:
                         time.sleep(0.05)
                         continue
-                    handle(db, ch)
+                    try:
+                        handle(db, ch)
+                        failures = 0
+                    except (PyMongoError, LookupError) as e:
+                        failures += 1
+                        obs.log_event("detector_event_failed", error=type(e).__name__, attempt=failures)
+                        if failures < MAX_EVENT_FAILURES:
+                            raise  # leave the with-block; resume from the last saved token and replay this event
+                        obs.log_event("detector_event_skipped", error=type(e).__name__)
+                        failures = 0
                     created = (ch.get("fullDocument") or {}).get("created_at")
+                    upd = {"resume_token": cs.resume_token, "last_event_at": now()}
                     if created:
                         lag = (now() - created).total_seconds()
                         obs.DETECTOR_LAG.set(lag)
                         obs.record_telemetry(db, "detector_lag_s", lag)
-                    db.detector_state.update_one({"_id": STATE_ID}, {"$set": {"resume_token": cs.resume_token, "last_event_at": now()},
-                                                                     "$inc": {"events_processed": 1}}, upsert=True)
+                        upd["last_created_at"] = created
+                    db.detector_state.update_one({"_id": STATE_ID}, {"$set": upd, "$inc": {"events_processed": 1}}, upsert=True)
             return
-        except OperationFailure as e:  # token fell off the oplog, or the stream died: re-sync, then watch fresh
-            if e.code not in RESYNC_CODES:
-                raise
-            obs.log_event("detector_resync", code=e.code)
-            since = (db.detector_state.find_one({"_id": STATE_ID}) or {}).get("last_event_at") \
-                or now() - timedelta(minutes=CATCHUP_DEFAULT_MIN)
-            db.detector_state.update_one({"_id": STATE_ID}, {"$unset": {"resume_token": ""}}, upsert=True)
-            kw = {}
+        except OperationFailure as e:
+            if e.code in RESYNC_CODES:  # token fell off the oplog, or the stream died: drop it, scan the gap, watch fresh
+                obs.log_event("detector_resync", code=e.code)
+                db.detector_state.update_one({"_id": STATE_ID}, {"$unset": {"resume_token": ""}}, upsert=True)
+            else:
+                obs.log_event("detector_error", code=e.code)
+                time.sleep(1)
+        except (PyMongoError, LookupError) as e:
+            obs.log_event("detector_error", error=type(e).__name__)
+            time.sleep(1)  # back off, then resume from the saved token
 
 
 def compensation_worker(stop: threading.Event | None = None, interval_s: float = 1.0) -> None:
@@ -228,8 +281,11 @@ def compensation_worker(stop: threading.Event | None = None, interval_s: float =
                 if rec and rec["status"] == c["to_status"] and c["denial_id"] in rec.get("reopened_for", []):
                     db.compensations.update_one({"_id": c["_id"]}, {"$set": {"status": "confirmed",
                                                                              "readback": {"status": rec["status"], "at": now()}}})
-                    db.denials.update_one({"denial_id": c["denial_id"]}, {"$set": {"status": "REVERSED"}})
-                    db.proposals.update_one({"tenant_id": c["tenant_id"], "case_id": c["record_id"]}, {"$set": {"status": "reversed"}})
+                    d = db.denials.find_one_and_update({"tenant_id": c["tenant_id"], "denial_id": c["denial_id"]},
+                                                       {"$set": {"status": "REVERSED"}})
+                    if d:  # only the proposal this denial executed, not every proposal on the case
+                        db.proposals.update_one({"tenant_id": c["tenant_id"], "proposal_id": d["proposal_id"]},
+                                                {"$set": {"status": "reversed"}})
                     continue
             except Exception as e:  # keep pending; R6 stays red until confirmed
                 obs.log_event("compensation_failed", denial=c["denial_id"], error=str(e))

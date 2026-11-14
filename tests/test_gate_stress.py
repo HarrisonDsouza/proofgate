@@ -46,7 +46,15 @@ def test_no_allow_commits_after_a_suspension():
     def run(p, ap):
         out.append(gate.execute(T, p["proposal_id"], ap["approval_id"], AGENT_ID, OPERATOR_ID))
 
-    ths = [threading.Thread(target=run, args=f) for f in fx]
+    errors = []
+
+    def guarded(p, ap):
+        try:
+            run(p, ap)
+        except Exception as e:  # a swallowed worker exception would make this test pass for the wrong reason
+            errors.append(e)
+
+    ths = [threading.Thread(target=guarded, args=f) for f in fx]
     def suspender():  # suspend only after at least one denial was authorised, so the test is not vacuous
         end = time.time() + 5
         while time.time() < end and not any(o["decision"] == "ALLOW" for o in list(out)):
@@ -61,6 +69,6 @@ def test_no_allow_commits_after_a_suspension():
     assert any(o["decision"] == "ALLOW" for o in out) and any(o["decision"] == "REFUSE" for o in out), "race did not occur"
     late_allow = db.gate_decisions.count_documents({"tenant_id": T, "reviewer_id": "dr-late", "decision": "ALLOW", "ts": {"$gt": susp["ts"]}})
     assert late_allow == 0, "an ALLOW decision was committed after the suspension"
-    for o in out:  # every ALLOW before the suspension must have been reopened by the compensation record
-        if o["decision"] == "ALLOW":
-            assert db.compensations.count_documents({"denial_id": o["denial_id"]}) <= 1
+    assert not errors, errors
+    # the suspension revoked every grant that was still unused; none can be spent afterwards
+    assert db.grants.count_documents({"tenant_id": T, "reviewer_id": "dr-late", "status": "issued"}) == 0

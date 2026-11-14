@@ -43,12 +43,13 @@ def main() -> int:
     db.suspensions.delete_many({"tenant_id": T, "reviewer_id": REVIEWER})
     db.reviewer_state.update_one({"_id": f"{T}|{REVIEWER}"}, {"$set": {"suspended": False}, "$unset": {"suspension_id": ""}})
     db.reviewer_stats.delete_one({"_id": f"{T}|{REVIEWER}"})
+    for r in (REVIEWER, "dr-skim"):  # a clean slate: earlier runs' approvals would count toward the median/CUSUM
+        db.approvals.delete_many({"tenant_id": T, "reviewer_id": r})
     ids = [p["proposal_id"] for p in db.proposals.find({"tenant_id": T, "status": "pending_review", "recommendation": "deny"}).limit(9)]
     sess = review.open_session(T, REVIEWER)["session_id"]
     active = lambda: db.suspensions.count_documents({"tenant_id": T, "reviewer_id": REVIEWER, "active": True})  # noqa: E731
 
     det = start()
-    wait_for(lambda: db.detector_state.find_one({"_id": "rubber_stamp_detector"}) is not None or True, 1)
     time.sleep(3)
     before = (db.detector_state.find_one({"_id": "rubber_stamp_detector"}) or {}).get("events_processed", 0)
     for pid in ids[:3]:  # 3 zero-dwell approvals: below the median window, so no alarm yet

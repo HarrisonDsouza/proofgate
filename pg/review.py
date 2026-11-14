@@ -10,6 +10,8 @@ import json
 import secrets
 from datetime import timedelta, timezone
 
+from pymongo.errors import DuplicateKeyError
+
 from pg.checks import credit_heartbeat
 from pg.db import client, get_db, now
 
@@ -79,8 +81,8 @@ def _session(db, tenant: str, session_id: str) -> dict:
 
 def _close_open_tokens(db, tenant: str, session_id: str) -> None:
     for t in db.view_tokens.find({"tenant_id": tenant, "session_id": session_id, "closed_at": None}):
-        db.view_tokens.update_one({"_id": t["_id"]}, {"$set": {"closed_at": now()}})
-        _event(db, tenant, session_id, t["reviewer_id"], t["case_id"], "close", 0, t["evidence_id"])
+        if db.view_tokens.find_one_and_update({"_id": t["_id"], "closed_at": None}, {"$set": {"closed_at": now()}}):
+            _event(db, tenant, session_id, t["reviewer_id"], t["case_id"], "close", 0, t["evidence_id"])  # once, not per racer
 
 
 def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str) -> dict:
@@ -91,12 +93,18 @@ def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str)
     ev = next((e for e in (case or {}).get("evidence", []) if e["evidence_id"] == evidence_id), None)
     if not ev:
         raise NotFound("unknown evidence")
-    _close_open_tokens(db, tenant, session_id)
-    tok, t0 = f"VT-{secrets.token_hex(8)}", now()
-    db.view_tokens.insert_one({"tenant_id": tenant, "token": tok, "session_id": session_id, "reviewer_id": sess["reviewer_id"],
-                               "case_id": case_id, "evidence_id": evidence_id, "evidence_hash": ev["hash"],
-                               "opened_at": t0, "last_hb_at": t0, "active_ms": 0, "idle_ms": 0, "closed_at": None,
-                               "expire_at": t0 + timedelta(hours=2)})
+    for attempt in range(5):  # unique partial index `one_open_view_per_session` makes parallel opens collide, not stack
+        _close_open_tokens(db, tenant, session_id)
+        tok, t0 = f"VT-{secrets.token_hex(8)}", now()
+        try:
+            db.view_tokens.insert_one({"tenant_id": tenant, "token": tok, "session_id": session_id, "reviewer_id": sess["reviewer_id"],
+                                       "case_id": case_id, "evidence_id": evidence_id, "evidence_hash": ev["hash"],
+                                       "opened_at": t0, "last_hb_at": t0, "active_ms": 0, "idle_ms": 0, "closed_at": None,
+                                       "expire_at": t0 + timedelta(hours=2)})
+            break
+        except DuplicateKeyError:
+            if attempt == 4:
+                raise
     _event(db, tenant, session_id, sess["reviewer_id"], case_id, "open", 0, evidence_id)
     return {"evidence_id": evidence_id, "label": ev["label"], "content": ev["content"], "hash": ev["hash"],
             "view_token": tok, "opened_at": t0.isoformat()}
@@ -110,9 +118,15 @@ def heartbeat(tenant: str, token: str, visible: bool, interacted_within_ms: int)
     n = now()
     credited = credit_heartbeat(t["last_hb_at"], n, visible, interacted_within_ms)
     gap = int((n - t["last_hb_at"]).total_seconds() * 1000)
+    # Compare-and-set on last_hb_at: ten parallel heartbeats cannot each be credited the same gap (that would turn
+    # 7 s of wall time into 70 s of dwell). Only the one that advances last_hb_at is credited; the rest get 0.
     t2 = db.view_tokens.find_one_and_update(
-        {"_id": t["_id"]}, {"$set": {"last_hb_at": n}, "$inc": {"active_ms": credited, "idle_ms": max(0, gap - credited)}},
+        {"_id": t["_id"], "last_hb_at": t["last_hb_at"], "closed_at": None},
+        {"$set": {"last_hb_at": n}, "$inc": {"active_ms": credited, "idle_ms": max(0, gap - credited)}},
         return_document=True)
+    if t2 is None:
+        cur = db.view_tokens.find_one({"_id": t["_id"]}) or t
+        return {"active_ms": cur["active_ms"], "idle_ms": cur["idle_ms"], "credited_ms": 0}
     _event(db, tenant, t["session_id"], t["reviewer_id"], t["case_id"], "heartbeat", credited, t["evidence_id"])
     return {"active_ms": t2["active_ms"], "idle_ms": t2["idle_ms"], "credited_ms": credited}
 
@@ -144,6 +158,8 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
     prop = db.proposals.find_one({"tenant_id": tenant, "proposal_id": proposal_id})
     if not prop:
         raise NotFound("unknown proposal")
+    if prop.get("status") not in ("pending_review", "needs_review", "approved"):
+        raise BadRequest(f"proposal is {prop.get('status')}; it cannot be approved again")
     rv = db.reviewers.find_one({"tenant_id": tenant, "reviewer_id": sess["reviewer_id"]})
     pol = db.review_policies.find_one({"tenant_id": tenant, "action_type": prop["action_type"], "status": "active"})
     _close_open_tokens(db, tenant, session_id)

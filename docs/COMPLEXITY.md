@@ -12,7 +12,15 @@ N = documents in a collection, W = detector window (200), E = events in a sessio
 | Telemetry | wrote to a collection that did not exist; never called | real Atlas time-series collection, 24 h TTL; gate latency and detector lag recorded; `/api/ops` does one `$group` with `$percentile` | `pg/db.py`, `pg/observability.py` |
 | Attestation scoring | n/a | O(T + E) per attestation; corpus document frequencies cached 5 min per tenant, O(total evidence tokens) rebuild | `pg/attest_score.py`, `pg/voice.py` |
 
+| Detector, per approval event | re-read 200 approvals and replayed CUSUM: O(W) per event | `check_streaming`: O(1) CUSUM work from a small `reviewer_stats` document (optimistic `ver` guard, safe with two detectors); rate and median stay index-bounded, O(log N + w). The streaming state is property-tested equal to the batch detector on 300 random sequences | `pg/detector.py`, `pg/cusum.py:SelfCusumState` |
+| Detector after downtime | events written while no detector watched (first start, or oplog history lost) were never seen | clusterTime is read, then the gap is scanned, then the stream starts at that clusterTime; resume token otherwise; transient errors resume from the token; a poison event is skipped after 5 tries | `pg/detector.py:run` |
+| Dwell credit | parallel heartbeats could each be credited the same gap (10 parallel = 10x credit); parallel evidence opens left several tokens accruing | compare-and-set on `last_hb_at`; unique partial index allows one open view token per session | `pg/review.py` |
+| Suspension reopening | only CONFIRMED denials were reopened; one applied but not yet read back stood forever | AUTHORIZED denials whose grant is `used` are reopened too; `confirm()` after a suspension queues the compensation | `pg/gate.py` |
+| Gate G1 | an executed proposal could be approved again and denied twice | G1 needs the proposal `approved` by THIS approval; `approve()` refuses finished proposals | `pg/checks.py`, `pg/review.py` |
+
 ## Known and deliberately not changed
-- `detector.check_reviewer` re-reads up to W=200 approvals and replays the CUSUM on every event: O(W) per event, O(N x W) over a run. An incremental O(1) version (per-reviewer running state in its own document, never in `reviewer_state`, with an equivalence test against batch `SelfCusum`) is designed but **not built**; it is only worth shipping with the Hypothesis equivalence test.
+- The batch `detector.check_reviewer` replays the reviewer's whole history, O(N). It is only used at startup catch-up and as the test reference.
 - `compensations (status, next_attempt_at)` does not lead with `tenant_id` because the worker is cross-tenant.
 - Per-event rate check uses the `(tenant_id, reviewer_id, created_at)` index (IXSCAN, see `make explain`).
+- `pg/target.py:compensate` checks `reopened_for` and then writes in two steps (not atomic under two compensation workers), and `/compensate` has no auth. That file is Harry's: reported, not changed.
+- The replay guard compares `(created_at, approval_id)`: approvals tied on the same millisecond are handled by comparing against the maximum key at rebuild; an out-of-order event from a concurrent detector is skipped by the CAS retry, so under two detectors the CUSUM can miss one sample rather than double-count.

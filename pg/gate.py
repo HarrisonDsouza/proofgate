@@ -49,6 +49,17 @@ def active_policy(db, tenant: str, action_type: str, s=None) -> dict:
     return p
 
 
+def ensure_compensation(db, s, tenant: str, d: dict, policy: dict, suspension_id: str, t) -> int:
+    """Idempotent: one compensation per denial (unique index on denial_id). Returns 1 when newly created."""
+    r = db.compensations.update_one(
+        {"denial_id": d["denial_id"]},
+        {"$setOnInsert": {"tenant_id": tenant, "denial_id": d["denial_id"], "record_id": d["record_id"],
+                          "kind": policy["effect"]["kind"], "to_status": policy["effect"]["compensate_status"],
+                          "status": "pending", "attempts": 0, "next_attempt_at": t, "suspension_id": suspension_id}},
+        upsert=True, session=s)
+    return int(r.upserted_id is not None)
+
+
 def suspend_in_txn(db, s, tenant: str, reviewer_id: str, source: str, rule: str, observed: dict, policy: dict) -> dict:
     """Shared suspension writes (gate inline G6, change-stream detector, supervisor halt). Runs inside the caller's txn."""
     t = now()
@@ -66,22 +77,22 @@ def suspend_in_txn(db, s, tenant: str, reviewer_id: str, source: str, rule: str,
                              {"$set": {"status": "invalidated"}}, session=s)
     lookback = t - timedelta(milliseconds=policy["rules"]["compensation_lookback_ms"])
     created = 0
-    for d in db.denials.find({"tenant_id": tenant, "reviewer_id": reviewer_id, "status": "CONFIRMED",
-                              "confirmed_at": {"$gte": lookback}}, session=s):
-        r = db.compensations.update_one(
-            {"denial_id": d["denial_id"]},
-            {"$setOnInsert": {"tenant_id": tenant, "denial_id": d["denial_id"], "record_id": d["record_id"],
-                              "kind": policy["effect"]["kind"], "to_status": policy["effect"]["compensate_status"],
-                              "status": "pending", "attempts": 0, "next_attempt_at": t, "suspension_id": sid}},
-            upsert=True, session=s)
-        created += int(r.upserted_id is not None)
+    # AUTHORIZED covers a denial the target already applied but confirm() has not yet read back: its grant is `used`
+    # (revoked/issued grants changed nothing at the target, so they need no compensation).
+    for d in db.denials.find({"tenant_id": tenant, "reviewer_id": reviewer_id, "status": {"$in": ["AUTHORIZED", "CONFIRMED"]},
+                              "created_at": {"$gte": lookback}}, session=s):
+        g = db.grants.find_one({"_id": d["grant_id"], "tenant_id": tenant}, session=s)
+        if not g or g.get("status") != "used":
+            continue
+        created += ensure_compensation(db, s, tenant, d, policy, sid, t)
     if not existing:
         db.suspensions.insert_one({"tenant_id": tenant, "suspension_id": sid, "reviewer_id": reviewer_id, "active": True,
                                    "source": source, "rule": rule, "observed": observed, "policy_id": policy["policy_id"],
                                    "policy_version": policy["version"], "ts": t, "grants_revoked": revoked,
                                    "proposals_requeued": requeued, "compensations_created": created}, session=s)
-    _audit(db, s, tenant, "reviewer_suspended", source, reviewer_id=reviewer_id,
-           refs={"suspension_id": sid}, policy_version=policy["version"])
+    if not existing:
+        _audit(db, s, tenant, "reviewer_suspended", source, reviewer_id=reviewer_id,
+               refs={"suspension_id": sid}, policy_version=policy["version"])
     return {"suspension_id": sid, "grants_revoked": revoked, "proposals_requeued": requeued, "compensations_created": created}
 
 
@@ -182,9 +193,15 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
 
 
 def confirm(tenant: str, denial_id: str) -> dict:
-    """The gate reads the target back itself; CONFIRMED only if the effect and the grant match."""
+    """The gate reads the target back itself; CONFIRMED only if the effect and the grant match.
+
+    If the reviewer was suspended after the target applied the grant but before this read-back, the denial is
+    CONFIRMED (it did happen) but a compensation is queued here and the proposal stays `needs_review`: a suspended
+    reviewer's denial must not stand. The other order (suspension commits after this) is covered in suspend_in_txn."""
     db = get_db()
     d = db.denials.find_one({"tenant_id": tenant, "denial_id": denial_id})
+    if d is None:
+        raise LookupError("unknown denial")
     pol = db.review_policies.find_one({"tenant_id": tenant, "policy_id": d["policy_id"], "version": d["policy_version"]})
     rec = db.target_records.find_one({"tenant_id": tenant, "kind": pol["effect"]["kind"], "record_id": d["record_id"]})
     ok = rec and rec.get("status") == pol["effect"]["apply_status"] and rec.get("last_apply", {}).get("grant_id") == d["grant_id"]
@@ -193,7 +210,12 @@ def confirm(tenant: str, denial_id: str) -> dict:
     db.denials.update_one({"_id": d["_id"]}, {"$set": {"status": status, "readback": {"status": (rec or {}).get("status"), "at": t},
                                                        **({"confirmed_at": t} if ok else {})}})
     if ok:
-        db.proposals.update_one({"tenant_id": tenant, "proposal_id": d["proposal_id"]}, {"$set": {"status": "executed"}})
+        susp = db.suspensions.find_one({"tenant_id": tenant, "reviewer_id": d["reviewer_id"], "active": True})
+        if susp:
+            with client().start_session() as s:
+                s.with_transaction(lambda ss: ensure_compensation(db, ss, tenant, d, pol, susp["suspension_id"], t))
+        else:
+            db.proposals.update_one({"tenant_id": tenant, "proposal_id": d["proposal_id"]}, {"$set": {"status": "executed"}})
     return {"denial_id": denial_id, "status": status, "readback": {"status": (rec or {}).get("status"), "grant_id": d["grant_id"]}}
 
 

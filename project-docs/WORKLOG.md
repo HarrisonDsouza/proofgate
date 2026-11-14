@@ -16,7 +16,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 | #9 | Harry / `harry` | `make e2e` honest path + halt; core-ok logged; tag `core-ok` | tech lead | `make e2e` ALL PASS on Atlas | OK | 14:01 |
 | #10 | Harry / `harry` | React reviewer + examiner UI; make ui; make demo-case | tech lead | build clean; examiner checked live on Atlas; demo-case ALL PASS | OK | 14:08 |
 | #11 | Harry / `harry` | UI design pass from the design critique | design-critic + tech lead | build clean; checked live | OK | 14:10 |
-| #12 | Harry / `harry` | Ledger + Case File UI (directions A + C chosen by Harry), Supervisor page, self-hosted fonts, flow diagram | tech lead + Impeccable detector | build clean; detector 0 findings; Examiner, Supervisor, Review checked live; approve flow needs the console key | open | 14:55 |
+| #12 | Harry / `harry` | Ledger + Case File UI (directions A + C chosen by Harry), Supervisor page, self-hosted fonts, flow diagram | tech lead + Impeccable detector | build clean; detector 0 findings; Examiner, Supervisor, Review checked live; approve flow tested with the console key; 80 tests on Atlas on the final commit; GitHub Actions not started (account billing lock) | OK, merged | 15:27 |
 
 ## Events
 
@@ -58,6 +58,8 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - 14:55 PR #12 updated with the Ledger + Case File design; Impeccable and Diagram Design skills installed for Harry (files read first). Flow diagram in project-docs/design/.
 - 15:06 Browser test of the new UI with the console key: honest approval of CLM-A-0005 (51.7 s server-credited, 2 of 2 cited) → "Executed 1 of 1", DENIED stamp. "Select all · approve 50" → "Executed 0 of 50 · dr-demo suspended", both executed denials reopened. **Problem: the bulk click took about 5 minutes end to end** (50 sequential approval transactions, then 50 gate calls). Demo data reseeded (`make seed && make demo-case`, ALL PASS).
 - 15:15 Bulk speed-up (Harry approved): approve_bulk writes the 50 approvals, proposal updates, reviewer_state and hash-chained events in one transaction; the executor re-reads status and skips proposals a suspension already sent back. Scratch tenant: 50 approvals 2.1 s (was ~80 s), agent run 5.9 s. Browser: bulk 4.3 s + run-once 16.1 s, "Executed 0 of 50 · suspended". `make test` 80 passed, lint clean.
+- 15:20 Status audit (PRD, first handoff, combined plan vs code). README Results + disclosures filled from docs/eval-*.txt; baseline committed; enforcement map refreshed; judge Q&A placeholders filled and a do-not-claim list added; LangSmith hook applied to agent steps.
+- 15:27 PR #12 merged to main (17a6ab2). Open for teammates: Sukhman's DATA.md commit on `sukhman` is not merged; Neil has no commits.
 
 ## Checkpoints
 

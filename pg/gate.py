@@ -49,6 +49,17 @@ def active_policy(db, tenant: str, action_type: str, s=None) -> dict:
     return p
 
 
+def ensure_compensation(db, s, tenant: str, d: dict, policy: dict, suspension_id: str, t) -> int:
+    """Idempotent: one compensation per denial (unique index on denial_id). Returns 1 when newly created."""
+    r = db.compensations.update_one(
+        {"denial_id": d["denial_id"]},
+        {"$setOnInsert": {"tenant_id": tenant, "denial_id": d["denial_id"], "record_id": d["record_id"],
+                          "kind": policy["effect"]["kind"], "to_status": policy["effect"]["compensate_status"],
+                          "status": "pending", "attempts": 0, "next_attempt_at": t, "suspension_id": suspension_id}},
+        upsert=True, session=s)
+    return int(r.upserted_id is not None)
+
+
 def suspend_in_txn(db, s, tenant: str, reviewer_id: str, source: str, rule: str, observed: dict, policy: dict) -> dict:
     """Shared suspension writes (gate inline G6, change-stream detector, supervisor halt). Runs inside the caller's txn."""
     t = now()
@@ -66,22 +77,22 @@ def suspend_in_txn(db, s, tenant: str, reviewer_id: str, source: str, rule: str,
                              {"$set": {"status": "invalidated"}}, session=s)
     lookback = t - timedelta(milliseconds=policy["rules"]["compensation_lookback_ms"])
     created = 0
-    for d in db.denials.find({"tenant_id": tenant, "reviewer_id": reviewer_id, "status": "CONFIRMED",
-                              "confirmed_at": {"$gte": lookback}}, session=s):
-        r = db.compensations.update_one(
-            {"denial_id": d["denial_id"]},
-            {"$setOnInsert": {"tenant_id": tenant, "denial_id": d["denial_id"], "record_id": d["record_id"],
-                              "kind": policy["effect"]["kind"], "to_status": policy["effect"]["compensate_status"],
-                              "status": "pending", "attempts": 0, "next_attempt_at": t, "suspension_id": sid}},
-            upsert=True, session=s)
-        created += int(r.upserted_id is not None)
+    # AUTHORIZED covers a denial the target already applied but confirm() has not yet read back: its grant is `used`
+    # (revoked/issued grants changed nothing at the target, so they need no compensation).
+    for d in db.denials.find({"tenant_id": tenant, "reviewer_id": reviewer_id, "status": {"$in": ["AUTHORIZED", "CONFIRMED"]},
+                              "created_at": {"$gte": lookback}}, session=s):
+        g = db.grants.find_one({"_id": d["grant_id"], "tenant_id": tenant}, session=s)
+        if not g or g.get("status") != "used":
+            continue
+        created += ensure_compensation(db, s, tenant, d, policy, sid, t)
     if not existing:
         db.suspensions.insert_one({"tenant_id": tenant, "suspension_id": sid, "reviewer_id": reviewer_id, "active": True,
                                    "source": source, "rule": rule, "observed": observed, "policy_id": policy["policy_id"],
                                    "policy_version": policy["version"], "ts": t, "grants_revoked": revoked,
                                    "proposals_requeued": requeued, "compensations_created": created}, session=s)
-    _audit(db, s, tenant, "reviewer_suspended", source, reviewer_id=reviewer_id,
-           refs={"suspension_id": sid}, policy_version=policy["version"])
+    if not existing:
+        _audit(db, s, tenant, "reviewer_suspended", source, reviewer_id=reviewer_id,
+               refs={"suspension_id": sid}, policy_version=policy["version"])
     return {"suspension_id": sid, "grants_revoked": revoked, "proposals_requeued": requeued, "compensations_created": created}
 
 
@@ -170,41 +181,87 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
         with client().start_session() as s:
             out = s.with_transaction(body, read_concern=ReadConcern("snapshot"), write_concern=WriteConcern("majority"))
     out["txn_attempts"] = attempts["n"]
-    db.gate_decisions.update_one({"decision_id": out["gate_decision_id"]}, {"$set": {"txn_attempts": attempts["n"]}})
     obs.DECISIONS.labels(out["decision"], "agent").inc()
     obs.OPERATE_LATENCY.observe(tm["ms"] / 1000)
     if attempts["n"] > 1:
         obs.TXN_RETRIES.inc(attempts["n"] - 1)
+    obs.record_telemetry(db, "gate_latency_ms", tm["ms"], tenant_id=tenant, decision=out["decision"], attempts=attempts["n"],
+                         gate_decision_id=out["gate_decision_id"])
     obs.log_event("gate", decision=out["decision"], proposal=proposal_id, attempts=attempts["n"], ms=round(tm["ms"], 1),
                   gate_decision_id=out["gate_decision_id"])
     return out
 
 
 def confirm(tenant: str, denial_id: str) -> dict:
-    """The gate reads the target back itself; CONFIRMED only if the effect and the grant match."""
+    """The gate reads the target back itself; CONFIRMED only if the effect and the grant match.
+
+    If the reviewer was suspended after the target applied the grant but before this read-back, the denial is
+    CONFIRMED (it did happen) but a compensation is queued here and the proposal stays `needs_review`: a suspended
+    reviewer's denial must not stand. The other order (suspension commits after this) is covered in suspend_in_txn."""
     db = get_db()
     d = db.denials.find_one({"tenant_id": tenant, "denial_id": denial_id})
+    if d is None:
+        raise LookupError("unknown denial")
     pol = db.review_policies.find_one({"tenant_id": tenant, "policy_id": d["policy_id"], "version": d["policy_version"]})
-    rec = db.target_records.find_one({"tenant_id": tenant, "record_id": d["record_id"]})
+    rec = db.target_records.find_one({"tenant_id": tenant, "kind": pol["effect"]["kind"], "record_id": d["record_id"]})
     ok = rec and rec.get("status") == pol["effect"]["apply_status"] and rec.get("last_apply", {}).get("grant_id") == d["grant_id"]
     status = "CONFIRMED" if ok else "NOT_EXECUTED"
     t = now()
     db.denials.update_one({"_id": d["_id"]}, {"$set": {"status": status, "readback": {"status": (rec or {}).get("status"), "at": t},
                                                        **({"confirmed_at": t} if ok else {})}})
     if ok:
-        db.proposals.update_one({"tenant_id": tenant, "proposal_id": d["proposal_id"]}, {"$set": {"status": "executed"}})
+        susp = db.suspensions.find_one({"tenant_id": tenant, "reviewer_id": d["reviewer_id"], "active": True})
+        if susp:
+            with client().start_session() as s:
+                s.with_transaction(lambda ss: ensure_compensation(db, ss, tenant, d, pol, susp["suspension_id"], t))
+        else:
+            db.proposals.update_one({"tenant_id": tenant, "proposal_id": d["proposal_id"]}, {"$set": {"status": "executed"}})
     return {"denial_id": denial_id, "status": status, "readback": {"status": (rec or {}).get("status"), "grant_id": d["grant_id"]}}
 
 
+class PolicyRejected(ValueError):
+    """The requested policy change is not allowed (unknown key, wrong type, or it would loosen a protection)."""
+
+
+# The only keys a supervisor may change through the API, and which direction is TIGHTER. Anything else (including
+# `baseline_only_existence`, which turns every check but G1 off, and `require_specialty_match`) is rejected.
+TUNABLE = {"min_active_dwell_ms": "up", "min_item_active_ms": "up", "rate_window_ms": "up", "compensation_lookback_ms": "up",
+           "rate_max_approvals": "down", "max_proposal_age_ms": "down"}
+MAX_MS = 7 * 24 * 3600 * 1000
+
+
+def validate_policy_change(current: dict, changes: dict) -> dict:
+    """Return the validated subset to merge, or raise PolicyRejected. Tightening only: floors and windows may rise,
+    caps and ages may fall. A policy API that can loosen is a way to switch the gate off with one request."""
+    if not isinstance(changes, dict) or not changes:
+        raise PolicyRejected("rules must be a non-empty object")
+    out = {}
+    for k, v in changes.items():
+        if k not in TUNABLE:
+            raise PolicyRejected(f"{k!r} is not a tunable policy key")
+        if type(v) is not int:  # bool, float, str and None are all refused
+            raise PolicyRejected(f"{k} must be an integer")
+        if not (1 <= v <= MAX_MS):
+            raise PolicyRejected(f"{k} out of range")
+        cur = current.get(k)
+        if cur is not None and ((TUNABLE[k] == "up" and v < cur) or (TUNABLE[k] == "down" and v > cur)):
+            raise PolicyRejected(f"{k}={v} would loosen the policy (current {cur}); only tightening is allowed")
+        out[k] = v
+    return out
+
+
 def new_policy_version(tenant: str, action_type: str, rules: dict, rationale: str, created_by: str) -> dict:
-    """Supersede the active version and insert v+1 in one transaction (rules merged over the current ones)."""
+    """Supersede the active version and insert v+1 in one transaction (validated rules merged over the current ones)."""
     db = get_db()
+    rationale = str(rationale)[:500]
+    created_by = str(created_by)[:64]
 
     def body(s):
         cur = active_policy(db, tenant, action_type, s)
+        rules_ok = validate_policy_change(cur["rules"], rules)  # raises PolicyRejected: nothing is written
         db.review_policies.update_one({"_id": cur["_id"]}, {"$set": {"status": "superseded"}}, session=s)
         nv = {k: v for k, v in cur.items() if k != "_id"} | {"version": cur["version"] + 1, "status": "active",
-                                                              "rules": cur["rules"] | rules, "rationale": rationale,
+                                                              "rules": cur["rules"] | rules_ok, "rationale": rationale,
                                                               "created_by": created_by, "created_at": now()}
         db.review_policies.insert_one(nv, session=s)
         return {"policy_id": cur["policy_id"], "version": nv["version"], "status": "active", "superseded_version": cur["version"]}

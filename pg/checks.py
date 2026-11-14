@@ -37,9 +37,10 @@ def evaluate(*, approval: dict | None, proposal: dict, case: dict, policy: dict,
 
     # G1 approval for this case, unconsumed
     g1 = bool(approval) and approval.get("tenant_id") == tenant_id and approval.get("case_id") == proposal["case_id"] \
-        and approval.get("proposal_id") == proposal["proposal_id"] and approval.get("status") == "submitted"
+        and approval.get("proposal_id") == proposal["proposal_id"] and approval.get("status") == "submitted" \
+        and proposal.get("status") == "approved" and proposal.get("approval_id") == approval.get("approval_id")
     checks.append(_check("G1_APPROVAL_FOR_CASE", g1, approval.get("status") if approval else None, "submitted",
-                         "" if g1 else "no unconsumed approval for this case"))
+                         "" if g1 else "no unconsumed approval for this proposal, or proposal not in approved state"))
     if baseline_only:  # policy v0: the "approval exists" baseline used in the evaluation
         return g1, checks
     if not approval or not reviewer:

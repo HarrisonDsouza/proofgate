@@ -68,3 +68,44 @@ def test_self_cusum_limit_floor_gamer_from_start_is_not_caught():
     c = SelfCusum(0.4, h=h)
     rng = np.random.default_rng(2)
     assert np.mean([c.run(rng.uniform(31, 38, 50)) is not None for _ in range(200)]) < 0.1
+
+
+def test_streaming_state_equals_batch_for_any_input():
+    """The O(1)-per-event detector must raise the same first alarm as the O(W) batch version, for every sequence."""
+    from hypothesis import given, settings
+    from hypothesis import strategies as st
+
+    from pg.cusum import SelfCusum, SelfCusumState
+
+    @settings(max_examples=300, deadline=None)
+    @given(st.lists(st.floats(0.0, 600.0, allow_nan=False), min_size=0, max_size=80),
+           st.floats(0.2, 1.0), st.floats(1.0, 9.0), st.integers(2, 8))
+    def check(xs, sigma, h, warmup):
+        batch = SelfCusum(sigma, math.log(2), h, warmup).run(xs)
+        st_ = SelfCusumState(sigma, math.log(2), h, warmup)
+        got = None
+        for x in xs:
+            r = st_.push(x)
+            if got is None and r is not None:
+                got = r
+        assert got == batch
+
+    check()
+
+
+def test_state_survives_serialisation_mid_stream():
+    from pg.cusum import SelfCusum, SelfCusumState
+    xs = [60, 70, 65, 62, 66] + [20] * 12
+    a = SelfCusumState(0.4, math.log(2), 3.0, 5)
+    for x in xs[:9]:
+        a.push(x)
+    b = SelfCusumState.from_doc(a.to_doc(), 0.4, math.log(2), 3.0, 5)  # as if the detector restarted here
+    got = None
+    for x in xs[9:]:
+        got = got or b.push(x)
+    assert got == SelfCusum(0.4, math.log(2), 3.0, 5).run(xs)
+
+
+def test_detector_module_imports_and_exposes_entrypoints():
+    from pg import detector  # an ImportError here killed the detector silently in a subprocess once
+    assert callable(detector.run) and callable(detector.catch_up) and callable(detector.check_streaming)

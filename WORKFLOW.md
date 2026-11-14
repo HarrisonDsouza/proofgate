@@ -43,8 +43,13 @@ Or open it on github.com: the repo page shows "Compare & pull request".
 - Put the **proof command** in the description, so whoever merges can run it.
 - Small PRs, often: at least one per hour, and always before a checkpoint (13:15, 13:45, 14:30, 16:00).
 - **No untested pushes after 15:00.** Run `make ci` (ruff, pytest, secret scan) before every PR. GitHub Actions runs the same checks once the account billing lock is cleared.
-- **An automatic reviewer** (`.github/workflows/pr-review.yml`) comments on every PR within a few minutes. It checks the must-dos, the CLAUDE.md invariants, folder ownership and bugs, and ends with a verdict. Fix anything marked "do not merge" or "merge after fixes" first. It needs the repo secret `ANTHROPIC_API_KEY`; without it the review is skipped.
-- Merge it yourself once the check passes (no review is required, to keep us fast), or ask a teammate to look first if it touches a shared file.
+- **Every PR is reviewed by the tech lead** (Harry's Claude Code session). There is no automatic reviewer and no API key. When you open a PR, message Harry with the PR number.
+  - The review runs `make ci` on your branch, a code review, and a security review if the PR touches the gate, the target or grants.
+  - It checks: no secrets; the CLAUDE.md invariants; folder ownership; bugs on the demo path; and that the PR has a proof command.
+  - It posts one PR comment that starts with "Verdict: OK to merge", "Verdict: merge after fixes" or "Verdict: do not merge".
+  - Every PR and its verdict are logged in [project-docs/WORKLOG.md](project-docs/WORKLOG.md).
+- **Don't merge your own PR**: the tech lead merges after an OK verdict. If Harry is unreachable for 15 minutes and `make ci` passes, you may merge, and say so in the PR.
+- **After 16:00, bug-fix PRs only.** Anything else gets "do not merge".
 
 ## 4. Sync with main (do it after every merge and before every PR)
 

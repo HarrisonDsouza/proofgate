@@ -6,7 +6,7 @@ Status values: `todo` · `in progress` · `ready` · `accepted` · `cut`.
 
 | Id | From → To | What | Done check | Needed by | Status |
 |---|---|---|---|---|---|
-| H0 | Orchestrator → all | Sukhman's code (`pg/`, `seed/`, `eval/`, `tests/`, `data/`, `static/`, `Makefile`, CI) imported to `main` without the Claude attribution trailer | `make install test` passes on a fresh clone | asap | todo (awaiting Harry's OK) |
+| H0 | Orchestrator → all | Sukhman's code (`pg/`, `seed/`, `eval/`, `tests/`, `data/`, `static/`, `Makefile`, CI) imported to `main` without the Claude attribution trailer | `make install test` passes on a fresh clone | asap | accepted (PR #1, 15 tests pass) |
 | H1 | Harry → all | Sandbox cluster + `.env` values (shared by private DM, **never in git or chat**) + smoke | `make smoke` prints PASS for the transaction and the change stream | 13:15 | todo |
 | H2 | Harry → Sukhman | `make setup seed` on the sandbox: collections, validators, indexes, reviewers, cases, policy v1 | Atlas shows `proofgate.cases`; `curl -H 'X-Tenant-Id: payer-acme' :8080/api/queue` returns proposals | 13:15 | todo |
 | H3 | Sukhman → Harry | Gate + review flow live: sessions, evidence views, heartbeats, approvals, bulk, gate execute/confirm | `DEMO_DEBUG_HOOKS=true make test-conflict` all PASS; bulk 50 → executed 0 | 13:45 | todo |

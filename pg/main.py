@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -213,13 +213,13 @@ def explain(x_tenant_id: str = Header(...), reviewer_id: str = "dr-stamper"):
 
 
 @app.get("/api/ops")
-def ops(x_tenant_id: str = Header(...), minutes: int = 15):
+def ops(x_tenant_id: str = Header(...), minutes: int = Query(15, ge=1, le=1440)):
     """Ops panel: gate latency percentiles, retries and detector lag from the Atlas time-series collection.
     One $group over the (ts, meta) bucketed index: O(points in window)."""
     db = get_db()
     since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
     rows = list(db.telemetry.aggregate([
-        {"$match": {"ts": {"$gte": since}}},
+        {"$match": {"ts": {"$gte": since}, "meta.tenant_id": x_tenant_id}},
         {"$group": {"_id": "$meta.kind", "n": {"$sum": 1}, "avg": {"$avg": "$value"}, "max": {"$max": "$value"},
                     "p": {"$percentile": {"input": "$value", "p": [0.5, 0.95, 0.99], "method": "approximate"}}}}]))
     return clean({r["_id"]: {"n": r["n"], "avg": round(r["avg"], 2), "max": round(r["max"], 2),

@@ -254,7 +254,7 @@ def run(stop: threading.Event | None = None) -> None:
                     if created:
                         lag = (now() - created).total_seconds()
                         obs.DETECTOR_LAG.set(lag)
-                        obs.record_telemetry(db, "detector_lag_s", lag)
+                        obs.record_telemetry(db, "detector_lag_s", lag, tenant_id=ch["fullDocument"]["tenant_id"])
                         upd["last_created_at"] = created
                     db.detector_state.update_one({"_id": STATE_ID}, {"$set": upd, "$inc": {"events_processed": 1}}, upsert=True)
             return

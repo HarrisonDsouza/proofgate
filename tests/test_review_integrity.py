@@ -161,3 +161,81 @@ def test_policy_api_rejects_loosening_and_writes_nothing():
     assert db.review_policies.count_documents({"tenant_id": T, "status": "active"}) == 1
     out = gate.new_policy_version(T, "claim_denial", {"min_active_dwell_ms": 60000}, "tighten", "supervisor")
     assert out["version"] == v0 + 1
+
+
+def test_floor_gaming_is_flagged_for_the_examiner_and_never_suspends():
+    from pg import detector, review
+    from pg.db import get_db
+    db = get_db()
+    _clean(db, "dr-demo")
+    sid = review.open_session(T, "dr-demo")["session_id"]
+    ids = [p["proposal_id"] for p in db.proposals.find({"tenant_id": T, "status": "pending_review"}).limit(9)]
+    for pid in ids:
+        review.approve(T, sid, pid, "Reviewed in batch of one.")
+    db.approvals.update_many({"tenant_id": T, "session_id": sid}, {"$set": {"active_dwell_ms": 32000}})  # all just above the floor
+    last = db.approvals.find_one({"tenant_id": T, "session_id": sid})
+    detector.handle(db, {"fullDocument": last})
+    detector.handle(db, {"fullDocument": last})  # idempotent: still one flag document
+    flags = list(db.reviewer_flags.find({"tenant_id": T, "reviewer_id": "dr-demo", "kind": "FLOOR_CLUSTERING"}))
+    assert len(flags) == 1 and flags[0]["observed"]["n_near_floor"] == 9
+    assert db.suspensions.count_documents({"tenant_id": T, "reviewer_id": "dr-demo"}) == 0  # a flag, not a suspension
+
+
+def test_confirm_is_idempotent_and_unknown_ids_are_not_found():
+    from eval.test_conflict import seeded_honest_approval
+    from pg import gate, review, target
+    from pg.config import AGENT_ID, OPERATOR_ID
+    from pg.db import get_db
+    db = get_db()
+    _clean(db, "dr-prep")
+    with pytest.raises(review.NotFound):
+        gate.confirm(T, "D-DOES-NOT-EXIST")
+    with pytest.raises(review.NotFound):
+        gate.execute(T, "P-DOES-NOT-EXIST", "AP-X", AGENT_ID, OPERATOR_ID)
+    p, ap = seeded_honest_approval(db, "dr-prep")
+    res = gate.execute(T, p["proposal_id"], ap["approval_id"], AGENT_ID, OPERATOR_ID)
+    t = res["target"]
+    target.apply(T, t["kind"], t["record_id"], t["to_status"], f"Grant {res['grant_id']}", AGENT_ID)
+    assert gate.confirm(T, res["denial_id"])["status"] == "CONFIRMED"
+    db.denials.update_one({"denial_id": res["denial_id"]}, {"$set": {"status": "REVERSED"}})
+    db.proposals.update_one({"proposal_id": p["proposal_id"]}, {"$set": {"status": "reversed"}})
+    again = gate.confirm(T, res["denial_id"])                      # a repeat call must not flip it back
+    assert again["status"] == "REVERSED"
+    assert db.denials.find_one({"denial_id": res["denial_id"]})["status"] == "REVERSED"
+    assert db.proposals.find_one({"proposal_id": p["proposal_id"]})["status"] == "reversed"
+
+
+def test_detector_survives_an_unexpected_exception_and_keeps_processing():
+    import threading
+    import time
+
+    from pg import detector, review
+    from pg.db import get_db
+    db = get_db()
+    seen = {"n": 0}
+    real = detector.handle
+
+    def flaky(d, ch):
+        seen["n"] += 1
+        if seen["n"] <= 2:
+            raise ValueError("boom")  # not a PyMongoError: used to kill the thread
+        return real(d, ch)
+
+    detector.handle = flaky
+    stop = threading.Event()
+    th = threading.Thread(target=detector.run, args=(stop,), daemon=True)
+    try:
+        th.start()
+        time.sleep(3)
+        sid = review.open_session(T, "dr-demo")["session_id"]
+        for p in db.proposals.find({"tenant_id": T, "status": "pending_review"}).limit(4):
+            review.approve(T, sid, p["proposal_id"], "Reviewed in batch of one.")
+        end = time.time() + 20
+        while time.time() < end and seen["n"] < 5:
+            time.sleep(0.3)
+        assert th.is_alive(), "the detector thread died on an unexpected exception"
+        assert seen["n"] >= 5, seen
+    finally:
+        detector.handle = real
+        stop.set()
+        th.join(timeout=5)

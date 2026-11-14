@@ -77,3 +77,25 @@ def linear_fit(x, y) -> dict:
     pred = slope * x + intercept
     ss_res, ss_tot = float(((y - pred) ** 2).sum()), float(((y - y.mean()) ** 2).sum())
     return {"slope": float(slope), "intercept": float(intercept), "r2": 1 - ss_res / ss_tot if ss_tot else 1.0}
+
+
+def floor_cluster(dwells_ms: list[int], floor_ms: int, delta: float = 0.25, p0: float = 0.25, alpha: float = 0.001,
+                  min_n: int = 8) -> dict:
+    """Exact one-sided binomial test: do too many of a reviewer's approvals sit just above the policy floor?
+
+    A reviewer who learned the floor and reviews at 31-37 s every time passes every per-case check and, being
+    consistent from the very first case, defeats a self-baselined CUSUM. What gives them away is not speed but
+    BUNCHING: an unconstrained reviewer's times spread over a wide range, so few land in the narrow band
+    [floor, floor * (1 + delta)].
+
+    H0: each approval lands in the band with probability <= p0. p0 = 0.25 is deliberately conservative: a reviewer
+    whose median is only ~17% above the floor (log-sd 0.4) puts about 22% in a 25%-wide band, so an honest fast
+    reviewer is not flagged, while a floor-gamer (almost every approval in the band) is flagged after min_n.
+    Needs no honest-session data, only the policy floor and the model-free fact that bunching is improbable.
+    The result is an EXAMINER FLAG, never a suspension: time alone cannot prove intent."""
+    n = len(dwells_ms)
+    hi = floor_ms * (1 + delta)
+    k = sum(floor_ms <= d <= hi for d in dwells_ms)
+    p = float(binomtest(k, n, p0, alternative="greater").pvalue) if n else 1.0
+    return {"n": n, "n_near_floor": k, "band_ms": [int(floor_ms), int(hi)], "p0": p0, "p_value": p,
+            "flagged": bool(n >= min_n and p <= alpha)}

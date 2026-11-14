@@ -20,6 +20,7 @@ from pg import observability as obs
 from pg.checks import evaluate, rate_failed
 from pg.config import settings
 from pg.db import client, get_db, now
+from pg.review import NotFound
 
 
 class VersionMoved(PyMongoError):
@@ -143,7 +144,7 @@ def load_gate_inputs(db, s, tenant: str, proposal_id: str, approval_id: str, t) 
     ]
     row = next(iter(db.proposals.aggregate(pipeline, session=s)), None)
     if row is None:
-        raise LookupError("unknown proposal")
+        raise NotFound("unknown proposal")
     if not row["policy"]:
         raise LookupError(f"no active policy for {tenant}/{row['action_type']}")
     rid = row["_rid"]
@@ -243,7 +244,10 @@ def confirm(tenant: str, denial_id: str) -> dict:
     db = get_db()
     d = db.denials.find_one({"tenant_id": tenant, "denial_id": denial_id})
     if d is None:
-        raise LookupError("unknown denial")
+        raise NotFound("unknown denial")
+    if d["status"] != "AUTHORIZED":  # idempotent: a confirmed, reversed or failed denial is never flipped by a repeat call
+        return {"denial_id": denial_id, "status": d["status"],
+                "readback": {"status": (d.get("readback") or {}).get("status"), "grant_id": d["grant_id"]}}
     pol = db.review_policies.find_one({"tenant_id": tenant, "policy_id": d["policy_id"], "version": d["policy_version"]})
     rec = db.target_records.find_one({"tenant_id": tenant, "kind": pol["effect"]["kind"], "record_id": d["record_id"]})
     ok = rec and rec.get("status") == pol["effect"]["apply_status"] and rec.get("last_apply", {}).get("grant_id") == d["grant_id"]

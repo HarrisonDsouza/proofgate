@@ -18,7 +18,7 @@ from pg.checks import credit_heartbeat
 from pg.db import client, get_db, now
 
 
-class NotFound(Exception):
+class NotFound(LookupError):
     pass
 
 

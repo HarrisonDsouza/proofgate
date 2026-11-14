@@ -48,6 +48,7 @@ These are US figures; we are in Toronto. Say "US" plainly.
 - Report n honestly. With n < 20 approvals, say the fit is rough.
 
 ## 5. Limits
+Floor-gaming (reviewing at 31-37 s from the first case) is not stopped by the gate and not suspended by the detector; it raises a `FLOOR_CLUSTERING` examiner flag (`reviewer_flags`) once 8 or more of a reviewer's last 30 approvals sit just above the floor. Say it is a flag, not proof.
 Synthetic cases; volunteers are not physicians; dwell is server-observed behaviour, not proof of reading; cited figures
 were not reloaded from source files today.
 
@@ -65,5 +66,7 @@ deliberately NOT listed here; do not quote them.
 | `make rules` | R1-R8 | local Docker, re-run on Atlas |
 | `make test-restart` | detector killed mid-burst and restarted: one suspension from the change stream; second restart adds none; first start without a token catches up | local Docker, re-run on Atlas |
 | `pytest tests/test_gate_stress.py tests/test_review_integrity.py` | one approval cannot be spent twice; no ALLOW commits after a suspension; applied-but-unconfirmed denials are reopened; parallel heartbeats are credited once | local Docker, re-run on Atlas |
+
+Measured on the Atlas M10 from a laptop on 2026-11-14 (own commands, real database, not the simulator): a gate call has a median of 786 ms (was 1537 ms before the single-aggregation read path), and approving 50 proposals takes 1.9 s as one transaction (a loop of single approvals is about 1.2 s each, so about 61 s for 50). Quote latency only from a fresh run on the demo network.
 
 The Atlas run of the first four commands is the team's, from the PR review, and is the one to cite.

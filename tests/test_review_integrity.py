@@ -60,6 +60,7 @@ def test_parallel_heartbeats_are_credited_once():
     sid = review.open_session(T, rv["reviewer_id"])["session_id"]
     pr = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
     ev = db.cases.find_one({"tenant_id": T, "case_id": pr["case_id"]})["evidence"][0]["evidence_id"]
+    t0 = time.monotonic()
     tok = review.fetch_evidence(T, sid, pr["case_id"], ev)["view_token"]
     time.sleep(2.0)
     res = []
@@ -67,7 +68,11 @@ def test_parallel_heartbeats_are_credited_once():
     [t.start() for t in ths]
     [t.join() for t in ths]
     credited = sum(r["credited_ms"] for r in res)
-    assert 1500 <= credited <= 3500, f"10 parallel heartbeats credited {credited} ms for ~2 s of wall time"
+    elapsed = int((time.monotonic() - t0) * 1000)
+    # Each credit is the gap since the previous credited heartbeat, so the sum can never exceed real elapsed time.
+    # Over Atlas the 10 round trips themselves take seconds, so bound by measured wall time, not the 2 s sleep.
+    # Without the compare-and-set, 10 parallel heartbeats would each be credited the same ~2 s gap (about 20 s).
+    assert 1500 <= credited <= elapsed + 100, f"10 parallel heartbeats credited {credited} ms for {elapsed} ms of wall time"
 
 
 def test_parallel_evidence_opens_leave_one_open_token():

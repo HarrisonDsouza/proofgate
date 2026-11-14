@@ -8,6 +8,7 @@ suspends once, and that a second kill/restart does not create a second suspensio
 from __future__ import annotations
 
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -16,7 +17,8 @@ import time
 from pg import review
 from pg.db import get_db
 
-T, REVIEWER = "payer-acme", "dr-prep"
+REVIEWER = "dr-prep"
+T = ""  # set in main(): a throwaway tenant, never the demo tenant
 
 
 def report(name: str, ok: bool) -> bool:
@@ -39,7 +41,21 @@ def wait_for(pred, secs: float = 15.0) -> bool:
 
 
 def main() -> int:
+    global T
+    from seed.generate import reset, seed_tenant
     db = get_db()
+    T = f"scratch-{secrets.token_hex(4)}"
+    seed_tenant(db, T, 60, 7)
+    print(f"throwaway tenant {T} (the demo tenant is not touched)")
+    try:
+        return run_scenarios(db)
+    finally:
+        reset(db, T)
+        for coll in ("attestations", "reviewer_stats"):
+            db[coll].delete_many({"tenant_id": T})
+
+
+def run_scenarios(db) -> int:
     db.suspensions.delete_many({"tenant_id": T, "reviewer_id": REVIEWER})
     db.reviewer_state.update_one({"_id": f"{T}|{REVIEWER}"}, {"$set": {"suspended": False}, "$unset": {"suspension_id": ""}})
     db.reviewer_stats.delete_one({"_id": f"{T}|{REVIEWER}"})
@@ -81,7 +97,7 @@ def main() -> int:
     db.suspensions.delete_many({"tenant_id": T, "reviewer_id": r2})
     db.reviewer_state.update_one({"_id": f"{T}|{r2}"}, {"$set": {"suspended": False}, "$unset": {"suspension_id": ""}})
     db.reviewer_stats.delete_one({"_id": f"{T}|{r2}"})
-    db.detector_state.delete_many({})
+    db.detector_state.delete_one({"_id": "rubber_stamp_detector"})  # this database's detector only
     sess2 = review.open_session(T, r2)["session_id"]
     more = [p["proposal_id"] for p in db.proposals.find({"tenant_id": T, "status": "pending_review", "recommendation": "deny"}).limit(6)]
     for pid in more:

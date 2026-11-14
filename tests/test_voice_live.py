@@ -6,14 +6,14 @@ import pytest
 pytestmark = pytest.mark.skipif(not os.getenv("MONGODB_URI"), reason="needs MongoDB")
 
 
-def test_binding_replay_and_audio_hash():
+def test_binding_replay_and_audio_hash(scratch):
     from fastapi import HTTPException
 
     from pg import review, voice
     from pg.db import get_db
     db = get_db()
-    rv = db.reviewers.find_one({})
-    t = rv["tenant_id"]
+    t = scratch
+    rv = db.reviewers.find_one({"tenant_id": t})
     cases = [p for p in db.proposals.find({"tenant_id": t, "status": "pending_review"}).limit(2)]
     sid = review.open_session(t, rv["reviewer_id"])["session_id"]
     sha = os.urandom(32).hex()

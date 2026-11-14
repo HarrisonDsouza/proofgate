@@ -7,12 +7,12 @@ import pytest
 pytestmark = pytest.mark.skipif(not os.getenv("MONGODB_URI"), reason="needs MongoDB")
 
 
-def test_concurrent_events_keep_one_chain_and_tamper_is_found():
+def test_concurrent_events_keep_one_chain_and_tamper_is_found(scratch):
     from pg import review, rules
     from pg.db import get_db
     db = get_db()
-    rv = db.reviewers.find_one({})
-    t = rv["tenant_id"]
+    t = scratch
+    rv = db.reviewers.find_one({"tenant_id": t})
     sid = review.open_session(t, rv["reviewer_id"])["session_id"]
     ths = [threading.Thread(target=review._event, args=(db, t, sid, rv["reviewer_id"], "C", "heartbeat", 5000)) for _ in range(12)]
     [x.start() for x in ths]

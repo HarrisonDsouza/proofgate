@@ -16,6 +16,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 | #9 | Harry / `harry` | `make e2e` honest path + halt; core-ok logged; tag `core-ok` | tech lead | `make e2e` ALL PASS on Atlas | OK | 14:01 |
 | #10 | Harry / `harry` | React reviewer + examiner UI; make ui; make demo-case | tech lead | build clean; examiner checked live on Atlas; demo-case ALL PASS | OK | 14:08 |
 | #11 | Harry / `harry` | UI design pass from the design critique | design-critic + tech lead | build clean; checked live | OK | 14:10 |
+| #12 | Harry / `harry` | Design system, sidebar shell, Supervisor page in React | tech lead | build clean; Examiner, Supervisor, Review checked live at 1280x800 on Atlas; approve flow needs the console key (Harry) | pending Harry's approve-flow check | 14:17 |
 
 ## Events
 
@@ -48,6 +49,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
   - R1-R8 pass.
   - The halt created 1 compensation, which was confirmed; the record is OPEN again; R1-R8 still pass.
   - Together with test-conflict (forged burst 0 of 50) and bypass (403), **the core demo works: `core-ok`**.
+- 14:17 PR #12 opened: professional UI redesign + Supervisor page. Alignment audit (plan vs PRD, judge must-fixes, organizer rules) started; report goes to project-docs/research/alignment-audit.md.
 
 ## Checkpoints
 

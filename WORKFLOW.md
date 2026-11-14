@@ -34,7 +34,7 @@ Commit every small working step. It is your undo button.
 
 ## 3. Open a pull request into main
 
-When something works, `make test lint` passes, and you have its proof command (a curl, a test, or `make <target>`):
+When something works, `make ci` passes, and you have its proof command (a curl, a test, or `make <target>`):
 ```bash
 gh pr create --base main --head <your-name> --title "Gate transaction G1-G8" --body "How to check: <command>"
 ```
@@ -42,7 +42,7 @@ Or open it on github.com: the repo page shows "Compare & pull request".
 
 - Put the **proof command** in the description, so whoever merges can run it.
 - Small PRs, often: at least one per hour, and always before a checkpoint (13:15, 13:45, 14:30, 16:00).
-- **No untested pushes after 15:00.** CI (ruff, pytest, secret scan) runs on every PR.
+- **No untested pushes after 15:00.** Run `make ci` (ruff, pytest, secret scan) before every PR. GitHub Actions runs the same checks once the account billing lock is cleared.
 - **An automatic reviewer** (`.github/workflows/pr-review.yml`) comments on every PR within a few minutes. It checks the must-dos, the CLAUDE.md invariants, folder ownership and bugs, and ends with a verdict. Fix anything marked "do not merge" or "merge after fixes" first. It needs the repo secret `ANTHROPIC_API_KEY`; without it the review is skipped.
 - Merge it yourself once the check passes (no review is required, to keep us fast), or ask a teammate to look first if it touches a shared file.
 

@@ -219,20 +219,6 @@ def ops(x_tenant_id: str = Header(...), minutes: int = 15):
                              "p50": r["p"][0], "p95": r["p"][1], "p99": r["p"][2]} for r in rows})
 
 
-@app.get("/api/ops")
-def ops(x_tenant_id: str = Header(...), minutes: int = 15):
-    """Ops panel: gate latency percentiles, retries and detector lag from the Atlas time-series collection.
-    One $group over the time window: O(points in window)."""
-    db = get_db()
-    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
-    rows = list(db.telemetry.aggregate([
-        {"$match": {"ts": {"$gte": since}}},
-        {"$group": {"_id": "$meta.kind", "n": {"$sum": 1}, "avg": {"$avg": "$value"}, "max": {"$max": "$value"},
-                    "p": {"$percentile": {"input": "$value", "p": [0.5, 0.95, 0.99], "method": "approximate"}}}}]))
-    return clean({r["_id"]: {"n": r["n"], "avg": round(r["avg"], 2), "max": round(r["max"], 2),
-                             "p50": r["p"][0], "p95": r["p"][1], "p99": r["p"][2]} for r in rows})
-
-
 @app.get("/api/evidence/problem")
 def problem_evidence():
     return json.loads((Path(__file__).resolve().parent.parent / "data" / "processed" / "problem_figures.json").read_text())

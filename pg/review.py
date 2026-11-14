@@ -207,5 +207,12 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
 
 def approve_bulk(tenant: str, session_id: str, proposal_ids: list[str], attestation_text: str) -> dict:
     """The deliberate 'Select all, approve 50': same logic in a loop. The gate decides what executes."""
-    ids = [approve(tenant, session_id, pid, attestation_text)["approval_id"] for pid in proposal_ids]
+    pids = list(dict.fromkeys(proposal_ids))  # de-duplicate, keep order
+    found = {p["proposal_id"] for p in get_db().proposals.find({"tenant_id": tenant, "proposal_id": {"$in": pids},
+                                                                  "status": {"$in": ["pending_review", "needs_review"]}},
+                                                                 {"proposal_id": 1})}
+    missing = [p for p in pids if p not in found]
+    if missing:  # validate everything first: a bad id must not leave half a batch approved
+        raise BadRequest(f"{len(missing)} proposal id(s) unknown or not awaiting review, e.g. {missing[0]!r}; nothing was approved")
+    ids = [approve(tenant, session_id, pid, attestation_text)["approval_id"] for pid in pids]
     return {"submitted": len(ids), "approval_ids": ids}

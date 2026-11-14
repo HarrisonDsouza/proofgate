@@ -97,3 +97,30 @@ def test_ops_is_tenant_scoped_and_bounded(client):
     assert mine.get("gate_latency_ms", {}).get("n", 0) >= 1 and "gate_latency_ms" not in other
     assert client.get("/api/ops?minutes=0", headers={"X-Tenant-Id": T}).status_code == 422
     assert client.get("/api/ops?minutes=999999", headers={"X-Tenant-Id": T}).status_code == 422
+
+
+def test_input_caps_and_operator_injection(client, monkeypatch):
+    from pg import review
+    sid = review.open_session(T, "dr-demo")["session_id"]
+    h = {"X-Tenant-Id": T, "X-Session-Id": sid}
+    assert client.get("/api/queue?limit=0", headers=h).status_code == 422
+    assert client.get("/api/queue?limit=101", headers=h).status_code == 422
+    assert client.get("/api/queue?limit=100", headers=h).status_code == 200
+    for bad in ({"proposal_id": {"$ne": ""}}, {"proposal_id": 7}, {"proposal_id": ""}, {}, {"proposal_id": "P" * 101}):
+        assert client.post("/api/approvals", json=bad, headers=h).status_code == 422, bad
+    assert client.post("/api/approvals/bulk", json={"proposal_ids": "P-1"}, headers=h).status_code == 422
+    assert client.post("/api/approvals/bulk", json={"proposal_ids": [{"$ne": 1}]}, headers=h).status_code == 422
+    assert client.post("/api/approvals/bulk", json={"proposal_ids": ["P"] * 101}, headers=h).status_code == 422
+    assert client.post("/api/approvals/bulk", json={"proposal_ids": []}, headers=h).status_code == 422
+
+
+def test_bulk_with_one_bad_id_approves_nothing(client):
+    from pg import review
+    from pg.db import get_db
+    db = get_db()
+    sid = review.open_session(T, "dr-demo")["session_id"]
+    good = [p["proposal_id"] for p in db.proposals.find({"tenant_id": T, "status": "pending_review"}).limit(3)]
+    r = client.post("/api/approvals/bulk", json={"proposal_ids": good + ["P-DOES-NOT-EXIST"]},
+                    headers={"X-Tenant-Id": T, "X-Session-Id": sid})
+    assert r.status_code == 400
+    assert db.approvals.count_documents({"tenant_id": T, "session_id": sid}) == 0

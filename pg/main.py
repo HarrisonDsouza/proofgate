@@ -44,6 +44,14 @@ def clean(x):
 
 
 _same = same
+MAX_BULK = 100
+
+
+def _text(v, name: str, max_len: int, allow_empty: bool = False) -> str:
+    """Request fields that reach a Mongo filter must be plain bounded strings: a dict like {"$ne": ""} is an operator."""
+    if not isinstance(v, str) or (not v and not allow_empty) or len(v) > max_len:
+        raise HTTPException(422, f"{name} must be a string of at most {max_len} characters")
+    return v
 
 
 def agent_only(x_service_identity: str | None, x_service_key: str | None):
@@ -73,7 +81,7 @@ def sessions(body: dict):
 
 
 @app.get("/api/queue")
-def queue(x_tenant_id: str = Header(...), x_session_id: str | None = Header(None), status: str = "pending_review", limit: int = 50):
+def queue(x_tenant_id: str = Header(...), x_session_id: str | None = Header(None), status: str = "pending_review", limit: int = Query(50, ge=1, le=100)):
     db = get_db()
     q = {"tenant_id": x_tenant_id, "status": status, "recommendation": "deny"}
     if x_session_id:
@@ -111,13 +119,23 @@ def close_view(token: str, x_tenant_id: str = Header(...)):
 
 @app.post("/api/approvals", status_code=201)
 def approvals(body: dict, x_tenant_id: str = Header(...), x_session_id: str = Header(...)):
-    return clean(review.approve(x_tenant_id, x_session_id, body["proposal_id"], body.get("attestation_text", ""), body,
-                                    body.get("attestation_id")))
+    pid = _text(body.get("proposal_id"), "proposal_id", 100)  # a dict here would be a Mongo operator injection (S10)
+    att = _text(body.get("attestation_text", ""), "attestation_text", 2000, allow_empty=True)
+    aid = body.get("attestation_id")
+    aid = _text(aid, "attestation_id", 100) if aid is not None else None
+    if len(body) > 20:
+        raise HTTPException(422, "too many fields")
+    return clean(review.approve(x_tenant_id, x_session_id, pid, att, body, aid))
 
 
 @app.post("/api/approvals/bulk")
 def approvals_bulk(body: dict, x_tenant_id: str = Header(...), x_session_id: str = Header(...)):
-    return review.approve_bulk(x_tenant_id, x_session_id, body["proposal_ids"], body.get("attestation_text", "Reviewed in batch."))
+    ids = body.get("proposal_ids")
+    if not isinstance(ids, list) or not 1 <= len(ids) <= MAX_BULK:
+        raise HTTPException(422, f"proposal_ids must be a list of 1 to {MAX_BULK} strings")
+    ids = [_text(i, "proposal_ids[]", 100) for i in ids]
+    att = _text(body.get("attestation_text", "Reviewed in batch."), "attestation_text", 2000, allow_empty=True)
+    return review.approve_bulk(x_tenant_id, x_session_id, ids, att)
 
 
 # ---------------- agent ----------------

@@ -73,7 +73,9 @@ From the repo root, run `cp .env.example .env`, then edit `.env`:
 - `MONGODB_URI`: the string from step 2.
 - `DB_NAME=proofgate`.
 - `GATE_URL=http://localhost:8080` and `TARGET_URL=http://localhost:8080`. It's one process.
-- Keep `AGENT_SERVICE_KEY`, `DEMO_DEBUG_HOOKS=true` and `RUN_BACKGROUND=1` the same on every machine.
+- `AGENT_SERVICE_KEY` and `CONSOLE_KEY`: Harry generates them and DMs them with the URI. Everyone uses the same values. The API refuses to start with an empty, default or short key.
+- Keep `DEMO_DEBUG_HOOKS=false` and `RUN_BACKGROUND=1`.
+- In the UI, type the console key into the "Console key" box before "Start session". Without it, sessions and control actions get 401.
 - Neil also fills `LANGSMITH_*` and `ELEVENLABS_API_KEY`.
 
 `.env` is git-ignored. Check with `git status`: it must never appear.

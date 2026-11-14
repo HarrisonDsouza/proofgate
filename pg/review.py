@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+import time
 from datetime import timedelta, timezone
 
 from pymongo.errors import DuplicateKeyError
@@ -93,7 +94,7 @@ def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str)
     ev = next((e for e in (case or {}).get("evidence", []) if e["evidence_id"] == evidence_id), None)
     if not ev:
         raise NotFound("unknown evidence")
-    for attempt in range(5):  # unique partial index `one_open_view_per_session` makes parallel opens collide, not stack
+    for attempt in range(15):  # unique partial index `one_open_view_per_session` makes parallel opens collide, not stack
         _close_open_tokens(db, tenant, session_id)
         tok, t0 = f"VT-{secrets.token_hex(8)}", now()
         try:
@@ -103,8 +104,9 @@ def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str)
                                        "expire_at": t0 + timedelta(hours=2)})
             break
         except DuplicateKeyError:
-            if attempt == 4:
+            if attempt == 14:
                 raise
+            time.sleep(0.005 * (attempt + 1))  # another open raced us: back off, close its token, retry
     _event(db, tenant, session_id, sess["reviewer_id"], case_id, "open", 0, evidence_id)
     return {"evidence_id": evidence_id, "label": ev["label"], "content": ev["content"], "hash": ev["hash"],
             "view_token": tok, "opened_at": t0.isoformat()}

@@ -1,6 +1,6 @@
 # ProofGate: team plan for today
 
-**Status: DRAFT, awaiting Harry's review. No build work starts until it is approved.**
+**Status: DRAFT.** Where this differs from [COMBINED-PLAN.md](COMBINED-PLAN.md) (stack, ports, work split, timeline), COMBINED-PLAN wins.
 Written 12:16 EST, Sat Nov 14 2026. The build spec is still `docs/PRD.md`. This plan only adds who does what, how we coordinate, and the two partner add-ons.
 
 ## 1. Your requirements, restated

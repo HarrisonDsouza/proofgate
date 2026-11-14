@@ -1,0 +1,63 @@
+name: pr-review
+# Automatic reviewer for every pull request into main.
+# Needs the repo secret ANTHROPIC_API_KEY (Settings -> Secrets and variables -> Actions). Without it, this job is skipped.
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Check the API key is configured
+        id: key
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: echo "present=$([ -n "$KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        if: steps.key.outputs.present == 'yes'
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.key.outputs.present == 'yes'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR AUTHOR BRANCH: ${{ github.event.pull_request.head.ref }}
+
+            You are the ProofGate team's pull-request reviewer at a hackathon with a 5 PM deadline.
+            The PR branch is checked out. First read CLAUDE.md, project-docs/COMBINED-PLAN.md (sections 2 and 4),
+            WORKFLOW.md and project-docs/hackathon-rules.md. Then read the diff with `gh pr diff`.
+
+            Check, in this order, and report only real problems (no style nits):
+            1. Must-dos: no secrets, keys or connection strings anywhere in the diff; no .env file; nothing that
+               moves state out of MongoDB Atlas; no code copied from elsewhere.
+            2. Invariants from CLAUDE.md: the gate stays ONE transaction that always writes reviewer_state with a
+               version guard and passes session=s to every operation inside it; txn_attempts stored; dwell computed
+               only on the server (client dwell_ms ignored); tenant_id on every document, leading every compound
+               index, filtering every query; thresholds only from the active review_policies document; the target
+               changes a record only by atomically consuming a valid grant (else 403 + target_log); the LLM and
+               voice never decide anything.
+            3. Honesty: no number in README, docs, UI text or pitch that does not come from make eval, make rules,
+               make test-conflict or an Atlas query; no simulated figures from planning docs.
+            4. Ownership: per WORKFLOW.md, flag files changed outside the author's folders (branch name = owner),
+               and changes to shared files (pg/main.py routes, pg/config.py, requirements, .env.example, PRD API shapes).
+            5. Bugs and security in the changed code: correctness, unhandled errors on the demo path, injection,
+               keys reaching the browser.
+            6. Proof: does the PR description include a command that proves the change works? Say so if missing.
+
+            Post inline comments with mcp__github_inline_comment__create_inline_comment (confirmed: true) for
+            specific lines, then ONE top-level `gh pr comment` that starts with a verdict line:
+            "Verdict: OK to merge", "Verdict: merge after fixes" or "Verdict: do not merge", followed by a short
+            numbered list of findings (most severe first). Be brief and plain. Only post GitHub comments.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"

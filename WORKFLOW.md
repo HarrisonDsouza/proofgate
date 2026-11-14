@@ -43,6 +43,7 @@ Or open it on github.com: the repo page shows "Compare & pull request".
 - Put the **proof command** in the description, so whoever merges can run it.
 - Small PRs, often: at least one per hour, and always before a checkpoint (13:15, 13:45, 14:30, 16:00).
 - **No untested pushes after 15:00.** CI (ruff, pytest, secret scan) runs on every PR.
+- **An automatic reviewer** (`.github/workflows/pr-review.yml`) comments on every PR within a few minutes. It checks the must-dos, the CLAUDE.md invariants, folder ownership and bugs, and ends with a verdict. Fix anything marked "do not merge" or "merge after fixes" first. It needs the repo secret `ANTHROPIC_API_KEY`; without it the review is skipped.
 - Merge it yourself once the check passes (no review is required, to keep us fast), or ask a teammate to look first if it touches a shared file.
 
 ## 4. Sync with main (do it after every merge and before every PR)

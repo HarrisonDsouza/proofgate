@@ -61,6 +61,9 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - 15:20 Status audit (PRD, first handoff, combined plan vs code). README Results + disclosures filled from docs/eval-*.txt; baseline committed; enforcement map refreshed; judge Q&A placeholders filled and a do-not-claim list added; LangSmith hook applied to agent steps.
 - 15:27 PR #12 merged to main (17a6ab2). Open for teammates: Sukhman's DATA.md commit on `sukhman` is not merged; Neil has no commits.
 - 15:37 Persona (4 non-technical domain experts) and judge-archetype (4) review workflow; findings and prioritized actions in project-docs/research/persona-and-judge-review.md. Fix from it: executor no longer LangSmith-traced (grant token). PR #13 opened, awaiting Harry's merge.
+- 15:48 Review timer reworked (2 s beats, live preview, flush on switch/approve, paused state) and spinners on every Atlas action (5db2678).
+- 15:52 LLM triage agent for new claims (d5b8032): strict tool call, code validates citations/clauses, rules fallback; tested on Atlas (fallback path, no ANTHROPIC_API_KEY set) and in the browser; 9 offline tests.
+- 15:57 Judge panel (16 provided personas, simulated) in project-docs/research/judge-panel-review.md: 15 of 16 top-6 votes. make test-conflict re-run, all PASS, saved to docs/test-conflict.txt; demo.md fallbacks fixed (5666a3d). Demo tenant needs `make demo-case` before judging.
 
 ## Checkpoints
 

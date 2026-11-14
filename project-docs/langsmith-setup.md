@@ -20,7 +20,7 @@ Our agent is rules-based (PRD M3) and has no LLM unless we build S6. Tracing sti
 ## Steps
 
 1. **Account.**
-   - Sign up at LangSmith; the app is at smith.langchain.com [VERIFY current URL].
+   - Sign up at LangSmith; the app is at smith.langchain.com.
    - Note your region. If you are on the EU region, you also need `LANGSMITH_ENDPOINT`.
 2. **API key.** Settings → API Keys → create one. It starts with `ls_`.
 3. **Add to `.env`.** Never commit this file. Put no quotes or spaces around the values.
@@ -61,7 +61,7 @@ The agent lives in `pg/agent.py` (Harry), and `pg/observability.py` already has 
 
 **Do not leak credentials into traces.**
 - The grant id is a 60-second, single-use bearer credential. Show only its first 6 characters in traces.
-- Use a small wrapper, or `@traceable`'s input and output processing hooks if the researcher confirms they exist [VERIFY].
+- Use `@traceable(process_inputs=..., process_outputs=...)` on **every** span that touches a grant (confirmed; code sketch in [research/neil-tools.md](research/neil-tools.md)).
 - Never trace `.env` values or the `AGENT_SERVICE_KEY`.
 
 **Must not break the core.**
@@ -73,4 +73,4 @@ The agent lives in `pg/agent.py` (Harry), and `pg/observability.py` already has 
 - [ ] The hello trace is visible in the project.
 - [ ] One honest denial shows a trace from triage → gate → apply → confirm, tagged with its case id.
 - [ ] A burst shows refused `gate_execute` runs with reasons in their outputs.
-- [ ] A public share link to one trace is saved for the README [VERIFY that sharing is available on our plan].
+- [ ] A public share link to one trace is saved for the README (trace → more menu → Share; check the button exists on our plan).

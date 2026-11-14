@@ -1,0 +1,24 @@
+{
+  "as_of": "2026-11-14",
+  "note": "Cited figures, not loaded datasets: cms.gov and kff.org are unreachable from our machines. Open each source before saying a number on stage.",
+  "figures": [
+    {"id": "ma_pa_2024", "label": "Medicare Advantage prior-authorization determinations, 2024", "value": 52800000,
+     "source": "KFF analysis of CMS Part C reporting", "url": "https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/"},
+    {"id": "ma_denied_2024", "label": "Fully or partially denied", "value": 4100000, "share": 0.077,
+     "source": "KFF", "url": "https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/"},
+    {"id": "ma_appealed_2024", "label": "Share of denials appealed", "share": 0.115,
+     "source": "KFF", "url": "https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/"},
+    {"id": "ma_overturned_2024", "label": "Share of appeals overturned (fully or partially)", "share": 0.807,
+     "source": "KFF", "url": "https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/"},
+    {"id": "ma_denial_rate_range", "label": "Denial rate by insurer, 2024", "low": 0.042, "low_insurer": "Elevance", "high": 0.128, "high_insurer": "UnitedHealth Group",
+     "source": "KFF", "url": "https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/"},
+    {"id": "aca_innetwork_denied_2024", "label": "ACA Marketplace in-network claims denied, 2024", "value": 85000000, "share": 0.19,
+     "source": "KFF analysis of the CMS Transparency in Coverage PUF (as summarised by InsuranceNewsNet; check the KFF page)",
+     "url": "https://insurancenewsnet.com/oarticle/claims-denials-and-appeals-in-aca-marketplace-plans-in-2024"},
+    {"id": "aca_appealed_2024", "label": "Share of denied in-network claims appealed", "share_max": 0.01,
+     "source": "same", "url": "https://insurancenewsnet.com/oarticle/claims-denials-and-appeals-in-aca-marketplace-plans-in-2024"},
+    {"id": "pxdx_reported", "label": "The PxDx pattern as reported: denials in two months of 2022, ~1.2 s each", "value": 300000, "seconds_each": 1.2,
+     "source": "ProPublica / The Capitol Forum, 2023. Cigna disputes the report and says PxDx is not AI.",
+     "url": "https://www.propublica.org/article/cigna-pxdx-medical-health-insurance-rejection-claims"}
+  ]
+}

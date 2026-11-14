@@ -12,3 +12,7 @@ target/
 .DS_Store
 .env.*
 !.env.example
+data/raw/
+.hypothesis/
+.pytest_cache/
+.ruff_cache/

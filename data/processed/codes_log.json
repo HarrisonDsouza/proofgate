@@ -1,0 +1,14 @@
+{
+  "icd_rows": 97584,
+  "icd_billable": 74260,
+  "hcpcs_rows_raw": 8463,
+  "hcpcs_invalid_or_blank_dropped": 0,
+  "hcpcs_duplicate_codes_dropped": 0,
+  "hcpcs_rows_clean": 8463,
+  "orthopedics_icd": 60,
+  "orthopedics_hcpcs": 40,
+  "cardiology_icd": 60,
+  "cardiology_hcpcs": 40,
+  "sleep_medicine_icd": 37,
+  "sleep_medicine_hcpcs": 25
+}

@@ -1,0 +1,2 @@
+.speak { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
+.speak small { color: var(--ink-3); flex: 1 1 260px; }

@@ -7,11 +7,11 @@
 | Branch | Who | Folders you may change |
 |---|---|---|
 | `main` | everyone, via PRs only | - |
-| `harry` | Harry | `py/` (except `py/voice/`), `ui/` (except `ui/src/app/voice/`), `Makefile`, `README.md`, `docs/` |
-| `sukhman` | Sukhman | `gate/` |
-| `neil` | Neil | `py/voice/`, `ui/src/app/voice/`, `@traceable` lines in `py/agent/` (agree with Harry first) |
+| `harry` | Harry | `pg/db.py`, `pg/target.py`, `pg/agent.py`, `pg/rules.py`, `seed/`, `data/`, `eval/` (except `test_conflict.py`), `ui/` (except `ui/src/voice/`), `Makefile`, `README.md`, `docs/PREREGISTRATION.md` |
+| `sukhman` | Sukhman | `pg/review.py`, `pg/checks.py`, `pg/gate.py`, `pg/detector.py`, `pg/cusum.py`, `pg/riskcontrol.py`, `pg/stats.py`, `eval/test_conflict.py`, `docs/DATA.md` |
+| `neil` | Neil | `pg/voice.py`, `ui/src/voice/`, tracing lines in `pg/observability.py` and `pg/agent.py` (agree with Harry first) |
 
-Staying in your own folders means almost no merge conflicts. To change a shared file (`.env.example`, `project-docs/handoffs.md`, an API shape from PRD §8), tell the other person **before** you push.
+Staying in your own folders means almost no merge conflicts. Everyone may add their own test files in `tests/`. To change a shared file (`pg/main.py` routes, `pg/config.py`, `.env.example`, `requirements*.txt`, `project-docs/handoffs.md`, an API shape from PRD §8), tell the other people **before** you push.
 
 ## 1. Clone once
 
@@ -34,14 +34,16 @@ Commit every small working step. It is your undo button.
 
 ## 3. Open a pull request into main
 
-When something works and has its proof command (a curl, a test, or `make <target>`):
+When something works, `make test lint` passes, and you have its proof command (a curl, a test, or `make <target>`):
 ```bash
 gh pr create --base main --head <your-name> --title "Gate transaction G1-G8" --body "How to check: <command>"
 ```
 Or open it on github.com: the repo page shows "Compare & pull request".
 
 - Put the **proof command** in the description, so whoever merges can run it.
-- Small PRs, often: at least one per hour, and always before a checkpoint (12:40, 13:45, 14:45, 15:30).
+- Small PRs, often: at least one per hour, and always before a checkpoint (13:15, 13:45, 14:30, 16:00).
+- **No untested pushes after 15:00.** CI (ruff, pytest, secret scan) runs on every PR.
+- **An automatic reviewer** (`.github/workflows/pr-review.yml`) comments on every PR within a few minutes. It checks the must-dos, the CLAUDE.md invariants, folder ownership and bugs, and ends with a verdict. Fix anything marked "do not merge" or "merge after fixes" first. It needs the repo secret `ANTHROPIC_API_KEY`; without it the review is skipped.
 - Merge it yourself once the check passes (no review is required, to keep us fast), or ask a teammate to look first if it touches a shared file.
 
 ## 4. Sync with main (do it after every merge and before every PR)
@@ -69,8 +71,9 @@ If a conflict touches someone else's folder, stop and ask them. Don't guess.
 
 | Time | What |
 |---|---|
-| 12:40 | Smoke test passes; data in Atlas |
-| 13:45 | Core demo works (bulk 50 → 0; honest review executes; bypass → 403). Tag `core-ok` |
-| 14:15 | `docs/preregistration.md` merged before any eval run |
-| 15:30 | **Feature freeze**: bug-fix PRs only |
+| 13:15 | Smoke, setup and seed on the sandbox; fallback UI loads; `make bypass` PASS |
+| 13:45 | Core demo works (bulk 50 → 0; honest review executes + read-back; forged dwell → 0; bypass → 403; `make test-conflict` PASS). Tag `core-ok` |
+| 14:30 | `docs/PREREGISTRATION.md` merged before the held-out eval run |
+| 15:30 | Fallback burst video recorded |
+| 16:00 | **Feature freeze**: bug-fix PRs only |
 | 16:45 | Submitted on Cerebral Valley |

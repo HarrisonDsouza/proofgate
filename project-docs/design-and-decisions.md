@@ -5,22 +5,24 @@ Full spec: `docs/PRD.md` §7 (data) and §8 (architecture). How the idea was cho
 ## The parts
 
 ```
- Browser (Angular :4200)
-   review page · examiner page
-        │  /api                          /py
-        ▼                                 ▼
- Gate service (Spring Boot :8080)    Python service (FastAPI :8000)
-   sessions, evidence views,           mock claims system (needs a grant)
-   heartbeats, approvals,              rules R1-R8, agent control
-   THE GATE TRANSACTION,               [voice/attest - ElevenLabs, Neil]
-   policies, suspensions, confirm
-        │                                 │
- Detector (same Spring jar,         Python agent
-   "detector" profile):               triage: proposes denials
-   change stream → suspensions,       executor: gate → claims system → confirm
-   compensation worker                [@traceable → LangSmith, Neil]
-        │                                 │
-        └──────────► MongoDB Atlas ◄──────┘   (the only place state lives)
+ Browser: React (Vite) :4200, reviewer + examiner pages
+          fallback: static/index.html at :8080/
+        │  /api /target /rules /metrics
+        ▼
+ FastAPI pg.main :8080 (one Python process)
+   review.py   sessions, evidence views, heartbeats, approvals, bulk-50
+   checks.py   G1-G8 + dwell crediting (pure)
+   gate.py     THE GATE TRANSACTION, grants, suspensions, confirm
+   target.py   mock claims system at /target (needs a grant)
+   agent.py    triage: proposes denials; executor: gate → claims system → confirm
+               [LangSmith tracing, Neil]
+   rules.py    R1-R8 + examiner replay
+   voice.py    [ElevenLabs spoken attestation, Neil]
+   detector    change stream → suspensions + compensation worker
+               (a thread, or its own process via `make detector`)
+        │
+        ▼
+ MongoDB Atlas Hackathon Sandbox (the only place state lives)
 ```
 
 ## The flow of one denial
@@ -52,7 +54,7 @@ Full spec: `docs/PRD.md` §7 (data) and §8 (architecture). How the idea was cho
 | **Change-stream detector as a second line**, with its resume token stored in Atlas | It catches slow-burn patterns (low median dwell) and survives being killed and restarted. The inline G6 check is the first line. | Detector-only enforcement |
 | **`tenant_id` on every document and first in every index** | Two insurers on one cluster; one's suspension never touches the other. | A database per tenant |
 | **The agent is rules-based; an LLM is optional and only drafts text** | "The LLM proposes, code decides." No model can grant itself authority. | An LLM deciding the denial |
-| **Stack: Python + Spring Boot + Angular** | Matches the original three engineers' strengths. **Open question** now that the core team is two (see `PLAN.md` §9). | - |
+| **Stack: one Python FastAPI process + React (Vite)** | Sukhman's working Python implementation plus Harry's direction; fewer moving parts for a three-person team (see `COMBINED-PLAN.md` D1-D4) | Spring Boot gate + Angular (the original PRD stack) |
 | **No real auth, Docker or extra services** | Time. Demo login is a reviewer picker, and we say so. | - |
 | **LangSmith = debugging view only** (new) | Atlas stays the single record of authority, which keeps the audit story simple. | Using traces as the audit log |
 | **ElevenLabs spoken attestation is evidence, not a gate rule** (new) | Adds a meaningful, hard-to-bulk-stamp record without letting voice or AI influence a decision. | Making a voice check part of G1-G8 |

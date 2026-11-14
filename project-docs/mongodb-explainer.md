@@ -35,7 +35,7 @@ That is word for word what Statement One asks for: "collections, schema validati
 ### 2. Schema validation (`$jsonSchema`)
 - Every key collection rejects documents missing required fields. For example, an approval with no `tenant_id` or no `evidence_hashes_viewed` fails with "Document failed validation".
 - Validators check **shape only**. Thresholds live in the policy document, so compliance can change them without a deploy.
-- **Demo line:** `py/db/demo_invalid_insert.py` shows a bad insert being refused by the database itself.
+- **Demo line:** inserting an approval without evidence hashes (for example from a short script or mongosh, not the read-only MCP server) is refused by the database itself with "Document failed validation".
 
 ### 3. Multi-document transactions: the gate
 - `POST /api/gate/execute` runs **one** transaction with snapshot read concern and majority write concern.

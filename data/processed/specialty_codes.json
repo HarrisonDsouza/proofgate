@@ -1,0 +1,1068 @@
+{
+ "orthopedics": {
+  "icd10cm": [
+   [
+    "M16.0",
+    "Bilateral primary osteoarthritis of hip"
+   ],
+   [
+    "M16.11",
+    "Unilateral primary osteoarthritis, right hip"
+   ],
+   [
+    "M16.12",
+    "Unilateral primary osteoarthritis, left hip"
+   ],
+   [
+    "M16.2",
+    "Bilateral osteoarthritis resulting from hip dysplasia"
+   ],
+   [
+    "M16.31",
+    "Unilateral osteoarthritis resulting from hip dysplasia, right hip"
+   ],
+   [
+    "M16.32",
+    "Unilateral osteoarthritis resulting from hip dysplasia, left hip"
+   ],
+   [
+    "M16.4",
+    "Bilateral post-traumatic osteoarthritis of hip"
+   ],
+   [
+    "M16.51",
+    "Unilateral post-traumatic osteoarthritis, right hip"
+   ],
+   [
+    "M16.52",
+    "Unilateral post-traumatic osteoarthritis, left hip"
+   ],
+   [
+    "M16.6",
+    "Other bilateral secondary osteoarthritis of hip"
+   ],
+   [
+    "M16.7",
+    "Other unilateral secondary osteoarthritis of hip"
+   ],
+   [
+    "M17.0",
+    "Bilateral primary osteoarthritis of knee"
+   ],
+   [
+    "M17.11",
+    "Unilateral primary osteoarthritis, right knee"
+   ],
+   [
+    "M17.12",
+    "Unilateral primary osteoarthritis, left knee"
+   ],
+   [
+    "M17.2",
+    "Bilateral post-traumatic osteoarthritis of knee"
+   ],
+   [
+    "M17.31",
+    "Unilateral post-traumatic osteoarthritis, right knee"
+   ],
+   [
+    "M17.32",
+    "Unilateral post-traumatic osteoarthritis, left knee"
+   ],
+   [
+    "M17.4",
+    "Other bilateral secondary osteoarthritis of knee"
+   ],
+   [
+    "M17.5",
+    "Other unilateral secondary osteoarthritis of knee"
+   ],
+   [
+    "M23.011",
+    "Cystic meniscus, anterior horn of medial meniscus, right knee"
+   ],
+   [
+    "M23.012",
+    "Cystic meniscus, anterior horn of medial meniscus, left knee"
+   ],
+   [
+    "M23.021",
+    "Cystic meniscus, posterior horn of medial meniscus, right knee"
+   ],
+   [
+    "M23.022",
+    "Cystic meniscus, posterior horn of medial meniscus, left knee"
+   ],
+   [
+    "M23.031",
+    "Cystic meniscus, other medial meniscus, right knee"
+   ],
+   [
+    "M23.032",
+    "Cystic meniscus, other medial meniscus, left knee"
+   ],
+   [
+    "M23.041",
+    "Cystic meniscus, anterior horn of lateral meniscus, right knee"
+   ],
+   [
+    "M23.042",
+    "Cystic meniscus, anterior horn of lateral meniscus, left knee"
+   ],
+   [
+    "M23.051",
+    "Cystic meniscus, posterior horn of lateral meniscus, right knee"
+   ],
+   [
+    "M23.052",
+    "Cystic meniscus, posterior horn of lateral meniscus, left knee"
+   ],
+   [
+    "M23.061",
+    "Cystic meniscus, other lateral meniscus, right knee"
+   ],
+   [
+    "M23.062",
+    "Cystic meniscus, other lateral meniscus, left knee"
+   ],
+   [
+    "M23.211",
+    "Derangement of anterior horn of medial meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.212",
+    "Derangement of anterior horn of medial meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.221",
+    "Derangement of posterior horn of medial meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.222",
+    "Derangement of posterior horn of medial meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.231",
+    "Derangement of other medial meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.232",
+    "Derangement of other medial meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.241",
+    "Derangement of anterior horn of lateral meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.242",
+    "Derangement of anterior horn of lateral meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.251",
+    "Derangement of posterior horn of lateral meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.252",
+    "Derangement of posterior horn of lateral meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.261",
+    "Derangement of other lateral meniscus due to old tear or injury, right knee"
+   ],
+   [
+    "M23.262",
+    "Derangement of other lateral meniscus due to old tear or injury, left knee"
+   ],
+   [
+    "M23.311",
+    "Other meniscus derangements, anterior horn of medial meniscus, right knee"
+   ],
+   [
+    "M23.312",
+    "Other meniscus derangements, anterior horn of medial meniscus, left knee"
+   ],
+   [
+    "M23.321",
+    "Other meniscus derangements, posterior horn of medial meniscus, right knee"
+   ],
+   [
+    "M23.322",
+    "Other meniscus derangements, posterior horn of medial meniscus, left knee"
+   ],
+   [
+    "M23.331",
+    "Other meniscus derangements, other medial meniscus, right knee"
+   ],
+   [
+    "M23.332",
+    "Other meniscus derangements, other medial meniscus, left knee"
+   ],
+   [
+    "M23.341",
+    "Other meniscus derangements, anterior horn of lateral meniscus, right knee"
+   ],
+   [
+    "M23.342",
+    "Other meniscus derangements, anterior horn of lateral meniscus, left knee"
+   ],
+   [
+    "M23.351",
+    "Other meniscus derangements, posterior horn of lateral meniscus, right knee"
+   ],
+   [
+    "M23.352",
+    "Other meniscus derangements, posterior horn of lateral meniscus, left knee"
+   ],
+   [
+    "M23.361",
+    "Other meniscus derangements, other lateral meniscus, right knee"
+   ],
+   [
+    "M23.362",
+    "Other meniscus derangements, other lateral meniscus, left knee"
+   ],
+   [
+    "M23.41",
+    "Loose body in knee, right knee"
+   ],
+   [
+    "M23.42",
+    "Loose body in knee, left knee"
+   ],
+   [
+    "M23.51",
+    "Chronic instability of knee, right knee"
+   ],
+   [
+    "M23.52",
+    "Chronic instability of knee, left knee"
+   ],
+   [
+    "M23.611",
+    "Other spontaneous disruption of anterior cruciate ligament of right knee"
+   ]
+  ],
+  "hcpcs": [
+   [
+    "A4635",
+    "Underarm pad, crutch, replacement, each"
+   ],
+   [
+    "A4636",
+    "Replacement, handgrip, cane, crutch, or walker, each"
+   ],
+   [
+    "A4637",
+    "Replacement, tip, cane, crutch, walker, each."
+   ],
+   [
+    "E0100",
+    "Cane, includes canes of all materials, adjustable or fixed, with tip"
+   ],
+   [
+    "E0105",
+    "Cane, quad or three prong, includes canes of all materials, adjustable or fixed, with tips"
+   ],
+   [
+    "E0110",
+    "Crutches, forearm, includes crutches of various materials, adjustable or fixed, pair, complete with tips and handgrips"
+   ],
+   [
+    "E0111",
+    "Crutch forearm, includes crutches of various materials, adjustable or fixed, each, with tip and handgrips"
+   ],
+   [
+    "E0112",
+    "Crutches underarm, wood, adjustable or fixed, pair, with pads, tips and handgrips"
+   ],
+   [
+    "E0113",
+    "Crutch underarm, wood, adjustable or fixed, each, with pad, tip and handgrip"
+   ],
+   [
+    "E0114",
+    "Crutches underarm, other than wood, adjustable or fixed, pair, with pads, tips and handgrips"
+   ],
+   [
+    "E0116",
+    "Crutch, underarm, other than wood, adjustable or fixed, with pad, tip, handgrip, with or without shock absorber, each"
+   ],
+   [
+    "E0117",
+    "Crutch, underarm, articulating, spring assisted, each"
+   ],
+   [
+    "E0118",
+    "Crutch substitute, lower leg platform, with or without wheels, each"
+   ],
+   [
+    "E0130",
+    "Walker, rigid (pickup), adjustable or fixed height"
+   ],
+   [
+    "E0135",
+    "Walker, folding (pickup), adjustable or fixed height"
+   ],
+   [
+    "E0140",
+    "Walker, with trunk support, adjustable or fixed height, any type"
+   ],
+   [
+    "E0141",
+    "Walker, rigid, wheeled, adjustable or fixed height"
+   ],
+   [
+    "E0143",
+    "Walker, folding, wheeled, adjustable or fixed height"
+   ],
+   [
+    "E0144",
+    "Walker, enclosed, four sided framed, rigid or folding, wheeled with posterior seat"
+   ],
+   [
+    "E0147",
+    "Walker, heavy duty, multiple braking system, variable wheel resistance"
+   ],
+   [
+    "E0148",
+    "Walker, heavy duty, without wheels, rigid or folding, any type, each"
+   ],
+   [
+    "E0149",
+    "Walker, heavy duty, wheeled, rigid or folding, any type"
+   ],
+   [
+    "E0150",
+    "Combination wheeled walker with seat and transport chair, folding, adjustable or fixed height"
+   ],
+   [
+    "E0152",
+    "Walker, battery powered, wheeled, folding, adjustable or fixed height"
+   ],
+   [
+    "E0153",
+    "Platform attachment, forearm crutch, each"
+   ],
+   [
+    "E0154",
+    "Platform attachment, walker, each"
+   ],
+   [
+    "E0155",
+    "Wheel attachment, rigid pick-up walker, per pair"
+   ],
+   [
+    "E0156",
+    "Seat attachment, walker"
+   ],
+   [
+    "E0157",
+    "Crutch attachment, walker, each"
+   ],
+   [
+    "E0158",
+    "Leg extensions for walker, per set of four (4)"
+   ],
+   [
+    "E0159",
+    "Brake attachment for wheeled walker, replacement, each"
+   ],
+   [
+    "E0935",
+    "Continuous passive motion exercise device for use on knee only"
+   ],
+   [
+    "E0936",
+    "Continuous passive motion exercise device for use other than knee"
+   ],
+   [
+    "E2207",
+    "Wheelchair accessory, crutch and cane holder, each"
+   ],
+   [
+    "K0901",
+    "Knee orthosis (ko), single upright, thigh and calf, with adjustable flexion and extension joint (unicentric or polycentric), medial-lateral and rotation control, with or without varus/valgus adjustment, prefabricated, off-the-shelf Terminated December 31, 2016."
+   ],
+   [
+    "K0902",
+    "Knee orthosis (ko), double upright, thigh and calf, with adjustable flexion and extension joint (unicentric or polycentric), medial-lateral and rotation control, with or without varus/valgus adjustment, prefabricated, off-the-shelf Terminated December 31, 2016."
+   ],
+   [
+    "L0628",
+    "Lumbar-sacral orthosis, flexible, provides lumbo-sacral support, posterior extends from sacrococcygeal junction to t-9 vertebra, produces intracavitary pressure to reduce load on the intervertebral discs, includes straps, closures, may include stays, shoulder straps, pendulous abdomen design, prefabricated, off-the-shelf"
+   ],
+   [
+    "L0629",
+    "Lumbar-sacral orthosis, flexible, provides lumbo-sacral support, posterior extends from sacrococcygeal junction to t-9 vertebra, produces intracavitary pressure to reduce load on the intervertebral discs, includes straps, closures, may include stays, shoulder straps, pendulous abdomen design, custom fabricated"
+   ],
+   [
+    "L0630",
+    "Lumbar-sacral orthosis, sagittal control, with rigid posterior panel(s), posterior extends from sacrococcygeal junction to t-9 vertebra, produces intracavitary pressure to reduce load on the intervertebral discs, includes straps, closures, may include padding, stays, shoulder straps, pendulous abdomen design, prefabricated item that has been trimmed, bent, molded, assembled, or otherwise customized to fit a specific patient by an individual with expertise"
+   ],
+   [
+    "L0631",
+    "Lumbar-sacral orthosis, sagittal control, with rigid anterior and posterior panels, posterior extends from sacrococcygeal junction to t-9 vertebra, produces intracavitary pressure to reduce load on the intervertebral discs, includes straps, closures, may include padding, shoulder straps, pendulous abdomen design, prefabricated item that has been trimmed, bent, molded, assembled, or otherwise customized to fit a specific patient by an individual with expertise"
+   ]
+  ]
+ },
+ "cardiology": {
+  "icd10cm": [
+   [
+    "I10",
+    "Essential (primary) hypertension"
+   ],
+   [
+    "I20.0",
+    "Unstable angina"
+   ],
+   [
+    "I20.1",
+    "Angina pectoris with documented spasm"
+   ],
+   [
+    "I20.2",
+    "Refractory angina pectoris"
+   ],
+   [
+    "I20.81",
+    "Angina pectoris with coronary microvascular dysfunction"
+   ],
+   [
+    "I20.89",
+    "Other forms of angina pectoris"
+   ],
+   [
+    "I21.01",
+    "ST elevation (STEMI) myocardial infarction involving left main coronary artery"
+   ],
+   [
+    "I21.02",
+    "ST elevation (STEMI) myocardial infarction involving left anterior descending coronary artery"
+   ],
+   [
+    "I21.09",
+    "ST elevation (STEMI) myocardial infarction involving other coronary artery of anterior wall"
+   ],
+   [
+    "I21.11",
+    "ST elevation (STEMI) myocardial infarction involving right coronary artery"
+   ],
+   [
+    "I21.19",
+    "ST elevation (STEMI) myocardial infarction involving other coronary artery of inferior wall"
+   ],
+   [
+    "I21.21",
+    "ST elevation (STEMI) myocardial infarction involving left circumflex coronary artery"
+   ],
+   [
+    "I21.29",
+    "ST elevation (STEMI) myocardial infarction involving other sites"
+   ],
+   [
+    "I21.4",
+    "Non-ST elevation (NSTEMI) myocardial infarction"
+   ],
+   [
+    "I21.A1",
+    "Myocardial infarction type 2"
+   ],
+   [
+    "I21.A9",
+    "Other myocardial infarction type"
+   ],
+   [
+    "I21.B",
+    "Myocardial infarction with coronary microvascular dysfunction"
+   ],
+   [
+    "I25.10",
+    "Atherosclerotic heart disease of native coronary artery without angina pectoris"
+   ],
+   [
+    "I25.110",
+    "Atherosclerotic heart disease of native coronary artery with unstable angina pectoris"
+   ],
+   [
+    "I25.111",
+    "Atherosclerotic heart disease of native coronary artery with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.112",
+    "Atherosclerotic heart disease of native coronary artery with refractory angina pectoris"
+   ],
+   [
+    "I25.118",
+    "Atherosclerotic heart disease of native coronary artery with other forms of angina pectoris"
+   ],
+   [
+    "I25.2",
+    "Old myocardial infarction"
+   ],
+   [
+    "I25.3",
+    "Aneurysm of heart"
+   ],
+   [
+    "I25.41",
+    "Coronary artery aneurysm"
+   ],
+   [
+    "I25.42",
+    "Coronary artery dissection"
+   ],
+   [
+    "I25.5",
+    "Ischemic cardiomyopathy"
+   ],
+   [
+    "I25.6",
+    "Silent myocardial ischemia"
+   ],
+   [
+    "I25.710",
+    "Atherosclerosis of autologous vein coronary artery bypass graft(s) with unstable angina pectoris"
+   ],
+   [
+    "I25.711",
+    "Atherosclerosis of autologous vein coronary artery bypass graft(s) with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.712",
+    "Atherosclerosis of autologous vein coronary artery bypass graft(s) with refractory angina pectoris"
+   ],
+   [
+    "I25.718",
+    "Atherosclerosis of autologous vein coronary artery bypass graft(s) with other forms of angina pectoris"
+   ],
+   [
+    "I25.720",
+    "Atherosclerosis of autologous artery coronary artery bypass graft(s) with unstable angina pectoris"
+   ],
+   [
+    "I25.721",
+    "Atherosclerosis of autologous artery coronary artery bypass graft(s) with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.722",
+    "Atherosclerosis of autologous artery coronary artery bypass graft(s) with refractory angina pectoris"
+   ],
+   [
+    "I25.728",
+    "Atherosclerosis of autologous artery coronary artery bypass graft(s) with other forms of angina pectoris"
+   ],
+   [
+    "I25.730",
+    "Atherosclerosis of nonautologous biological coronary artery bypass graft(s) with unstable angina pectoris"
+   ],
+   [
+    "I25.731",
+    "Atherosclerosis of nonautologous biological coronary artery bypass graft(s) with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.732",
+    "Atherosclerosis of nonautologous biological coronary artery bypass graft(s) with refractory angina pectoris"
+   ],
+   [
+    "I25.738",
+    "Atherosclerosis of nonautologous biological coronary artery bypass graft(s) with other forms of angina pectoris"
+   ],
+   [
+    "I25.750",
+    "Atherosclerosis of native coronary artery of transplanted heart with unstable angina"
+   ],
+   [
+    "I25.751",
+    "Atherosclerosis of native coronary artery of transplanted heart with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.752",
+    "Atherosclerosis of native coronary artery of transplanted heart with refractory angina pectoris"
+   ],
+   [
+    "I25.758",
+    "Atherosclerosis of native coronary artery of transplanted heart with other forms of angina pectoris"
+   ],
+   [
+    "I25.760",
+    "Atherosclerosis of bypass graft of coronary artery of transplanted heart with unstable angina"
+   ],
+   [
+    "I25.761",
+    "Atherosclerosis of bypass graft of coronary artery of transplanted heart with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.762",
+    "Atherosclerosis of bypass graft of coronary artery of transplanted heart with refractory angina pectoris"
+   ],
+   [
+    "I25.768",
+    "Atherosclerosis of bypass graft of coronary artery of transplanted heart with other forms of angina pectoris"
+   ],
+   [
+    "I25.790",
+    "Atherosclerosis of other coronary artery bypass graft(s) with unstable angina pectoris"
+   ],
+   [
+    "I25.791",
+    "Atherosclerosis of other coronary artery bypass graft(s) with angina pectoris with documented spasm"
+   ],
+   [
+    "I25.792",
+    "Atherosclerosis of other coronary artery bypass graft(s) with refractory angina pectoris"
+   ],
+   [
+    "I25.798",
+    "Atherosclerosis of other coronary artery bypass graft(s) with other forms of angina pectoris"
+   ],
+   [
+    "I25.810",
+    "Atherosclerosis of coronary artery bypass graft(s) without angina pectoris"
+   ],
+   [
+    "I25.811",
+    "Atherosclerosis of native coronary artery of transplanted heart without angina pectoris"
+   ],
+   [
+    "I25.812",
+    "Atherosclerosis of bypass graft of coronary artery of transplanted heart without angina pectoris"
+   ],
+   [
+    "I25.82",
+    "Chronic total occlusion of coronary artery"
+   ],
+   [
+    "I25.83",
+    "Coronary atherosclerosis due to lipid rich plaque"
+   ],
+   [
+    "I25.84",
+    "Coronary atherosclerosis due to calcified coronary lesion"
+   ],
+   [
+    "I25.85",
+    "Chronic coronary microvascular dysfunction"
+   ],
+   [
+    "I25.89",
+    "Other forms of chronic ischemic heart disease"
+   ]
+  ],
+  "hcpcs": [
+   [
+    "C1605",
+    "Pacemaker, leadless, dual chamber (right atrial and right ventricular implantable components), rate-responsive, including all necessary components for implantation"
+   ],
+   [
+    "C1721",
+    "Cardioverter-defibrillator, dual chamber (implantable)"
+   ],
+   [
+    "C1722",
+    "Cardioverter-defibrillator, single chamber (implantable)"
+   ],
+   [
+    "C1759",
+    "Catheter, intracardiac echocardiography"
+   ],
+   [
+    "C1764",
+    "Event recorder, cardiac (implantable)"
+   ],
+   [
+    "C1766",
+    "Introducer/sheath, guiding, intracardiac electrophysiological, steerable, other than peel-away"
+   ],
+   [
+    "C1777",
+    "Lead, cardioverter-defibrillator, endocardial single coil (implantable)"
+   ],
+   [
+    "C1779",
+    "Lead, pacemaker, transvenous vdd single pass"
+   ],
+   [
+    "C1785",
+    "Pacemaker, dual chamber, rate-responsive (implantable)"
+   ],
+   [
+    "C1786",
+    "Pacemaker, single chamber, rate-responsive (implantable)"
+   ],
+   [
+    "C1817",
+    "Septal defect implant system, intracardiac"
+   ],
+   [
+    "C1824",
+    "Generator, cardiac contractility modulation (implantable)"
+   ],
+   [
+    "C1833",
+    "Monitor, cardiac, including intracardiac lead and all system components (implantable)"
+   ],
+   [
+    "C1882",
+    "Cardioverter-defibrillator, other than single or dual chamber (implantable)"
+   ],
+   [
+    "C1888",
+    "Catheter, ablation, non-cardiac, endovascular (implantable)"
+   ],
+   [
+    "C1892",
+    "Introducer/sheath, guiding, intracardiac electrophysiological, fixed-curve, peel-away"
+   ],
+   [
+    "C1893",
+    "Introducer/sheath, guiding, intracardiac electrophysiological, fixed-curve, other than peel-away"
+   ],
+   [
+    "C1894",
+    "Introducer/sheath, other than guiding, other than intracardiac electrophysiological, non-laser"
+   ],
+   [
+    "C1895",
+    "Lead, cardioverter-defibrillator, endocardial dual coil (implantable)"
+   ],
+   [
+    "C1896",
+    "Lead, cardioverter-defibrillator, other than endocardial single or dual coil (implantable)"
+   ],
+   [
+    "C1898",
+    "Lead, pacemaker, other than transvenous vdd single pass"
+   ],
+   [
+    "C1899",
+    "Lead, pacemaker/cardioverter-defibrillator combination (implantable)"
+   ],
+   [
+    "C2619",
+    "Pacemaker, dual chamber, non rate-responsive (implantable)"
+   ],
+   [
+    "C2620",
+    "Pacemaker, single chamber, non rate-responsive (implantable)"
+   ],
+   [
+    "C2621",
+    "Pacemaker, other than single or dual chamber (implantable)"
+   ],
+   [
+    "C2629",
+    "Introducer/sheath, other than guiding, other than intracardiac electrophysiological, laser"
+   ],
+   [
+    "C7517",
+    "Catheter placement in coronary artery(s) for coronary angiography, including intraprocedural injection(s) for coronary angiography, with iliac and/or femoral artery angiography, non-selective, bilateral or ipsilateral to catheter insertion, performed at the same time as cardiac catheterization and/or coronary angiography, includes positioning or placement of the catheter in the distal aorta or ipsilateral femoral or iliac artery, injection of dye, production of permanent images, and radiologic supervision and interpretation"
+   ],
+   [
+    "C7520",
+    "Catheter placement in coronary artery(ies) for coronary angiography, including intraprocedural injection(s) for coronary angiography, imaging supervision and interpretation, with catheter placement(s) in bypass graft(s) (internal mammary, free arterial, venous grafts) includes intraprocedural injection(s) for bypass graft angiography with iliac and/or femoral artery angiography, non-selective, bilateral or ipsilateral to catheter insertion, performed at the same time as cardiac catheterization and/or coronary angiography, includes positioning or placement of the catheter in the distal aorta or ipsilateral femoral or iliac artery, injection of dye, production of permanent images, and radiologic supervision and interpretation"
+   ],
+   [
+    "C7537",
+    "Insertion of new or replacement of permanent pacemaker with atrial transvenous electrode(s), with insertion of pacing electrode, cardiac venous system, for left ventricular pacing, at time of insertion of implantable defibrillator or pacemaker pulse generator (e.g., for upgrade to dual chamber system)"
+   ],
+   [
+    "C7538",
+    "Insertion of new or replacement of permanent pacemaker with ventricular transvenous electrode(s), with insertion of pacing electrode, cardiac venous system, for left ventricular pacing, at time of insertion of implantable defibrillator or pacemaker pulse generator (e.g., for upgrade to dual chamber system)"
+   ],
+   [
+    "C7539",
+    "Insertion of new or replacement of permanent pacemaker with atrial and ventricular transvenous electrode(s), with insertion of pacing electrode, cardiac venous system, for left ventricular pacing, at time of insertion of implantable defibrillator or pacemaker pulse generator (eg, for upgrade to dual chamber system)"
+   ],
+   [
+    "C7540",
+    "Removal of permanent pacemaker pulse generator with replacement of pacemaker pulse generator, dual lead system, with insertion of pacing electrode, cardiac venous system, for left ventricular pacing, at time of insertion of implantable defibrillator or pacemaker pulse generator (eg, for upgrade to dual chamber system)"
+   ],
+   [
+    "C8921",
+    "Transthoracic echocardiography with contrast, or without contrast followed by with contrast, for congenital cardiac anomalies; complete"
+   ],
+   [
+    "C8922",
+    "Transthoracic echocardiography with contrast, or without contrast followed by with contrast, for congenital cardiac anomalies; follow-up or limited study"
+   ],
+   [
+    "C8926",
+    "Transesophageal echocardiography (tee) with contrast, or without contrast followed by with contrast, for congenital cardiac anomalies; including probe placement, image acquisition, interpretation and report"
+   ],
+   [
+    "C8927",
+    "Transesophageal echocardiography (tee) with contrast, or without contrast followed by with contrast, for monitoring purposes, including probe placement, real time 2-dimensional image acquisition and interpretation leading to ongoing (continuous) assessment of (dynamically changing) cardiac pumping function and to therapeutic measures on an immediate time basis"
+   ],
+   [
+    "C8928",
+    "Transthoracic echocardiography with contrast, or without contrast followed by with contrast, real-time with image documentation (2d), includes m-mode recording, when performed, during rest and cardiovascular stress test using treadmill, bicycle exercise and/or pharmacologically induced stress, with interpretation and report"
+   ],
+   [
+    "C8930",
+    "Transthoracic echocardiography, with contrast, or without contrast followed by with contrast, real-time with image documentation (2d), includes m-mode recording, when performed, during rest and cardiovascular stress test using treadmill, bicycle exercise and/or pharmacologically induced stress, with interpretation and report; including performance of continuous electrocardiographic monitoring, with physician supervision"
+   ],
+   [
+    "C9750",
+    "Insertion or removal and replacement of intracardiac ischemia monitoring system including imaging supervision and interpretation and peri-operative interrogation and programming; complete system (includes device and electrode) Terminated December 31, 2018."
+   ],
+   [
+    "C9758",
+    "Blinded procedure for nyha class iii/iv heart failure; transcatheter implantation of interatrial shunt or placebo control, including right heart catheterization, trans-esophageal echocardiography (tee)/intracardiac echocardiography (ice), and all imaging with or without guidance (e.g., ultrasound, fluoroscopy), performed in an approved investigational device exemption (ide) study"
+   ]
+  ]
+ },
+ "sleep_medicine": {
+  "icd10cm": [
+   [
+    "G47.01",
+    "Insomnia due to medical condition"
+   ],
+   [
+    "G47.09",
+    "Other insomnia"
+   ],
+   [
+    "G47.11",
+    "Idiopathic hypersomnia with long sleep time"
+   ],
+   [
+    "G47.12",
+    "Idiopathic hypersomnia without long sleep time"
+   ],
+   [
+    "G47.13",
+    "Recurrent hypersomnia"
+   ],
+   [
+    "G47.14",
+    "Hypersomnia due to medical condition"
+   ],
+   [
+    "G47.19",
+    "Other hypersomnia"
+   ],
+   [
+    "G47.21",
+    "Circadian rhythm sleep disorder, delayed sleep phase type"
+   ],
+   [
+    "G47.22",
+    "Circadian rhythm sleep disorder, advanced sleep phase type"
+   ],
+   [
+    "G47.23",
+    "Circadian rhythm sleep disorder, irregular sleep wake type"
+   ],
+   [
+    "G47.24",
+    "Circadian rhythm sleep disorder, free running type"
+   ],
+   [
+    "G47.25",
+    "Circadian rhythm sleep disorder, jet lag type"
+   ],
+   [
+    "G47.26",
+    "Circadian rhythm sleep disorder, shift work type"
+   ],
+   [
+    "G47.27",
+    "Circadian rhythm sleep disorder in conditions classified elsewhere"
+   ],
+   [
+    "G47.29",
+    "Other circadian rhythm sleep disorder"
+   ],
+   [
+    "G47.31",
+    "Primary central sleep apnea"
+   ],
+   [
+    "G47.32",
+    "High altitude periodic breathing"
+   ],
+   [
+    "G47.33",
+    "Obstructive sleep apnea (adult) (pediatric)"
+   ],
+   [
+    "G47.34",
+    "Idiopathic sleep related nonobstructive alveolar hypoventilation"
+   ],
+   [
+    "G47.35",
+    "Congenital central alveolar hypoventilation syndrome"
+   ],
+   [
+    "G47.36",
+    "Sleep related hypoventilation in conditions classified elsewhere"
+   ],
+   [
+    "G47.37",
+    "Central sleep apnea in conditions classified elsewhere"
+   ],
+   [
+    "G47.39",
+    "Other sleep apnea"
+   ],
+   [
+    "G47.411",
+    "Narcolepsy with cataplexy"
+   ],
+   [
+    "G47.419",
+    "Narcolepsy without cataplexy"
+   ],
+   [
+    "G47.421",
+    "Narcolepsy in conditions classified elsewhere with cataplexy"
+   ],
+   [
+    "G47.429",
+    "Narcolepsy in conditions classified elsewhere without cataplexy"
+   ],
+   [
+    "G47.51",
+    "Confusional arousals"
+   ],
+   [
+    "G47.52",
+    "REM sleep behavior disorder"
+   ],
+   [
+    "G47.53",
+    "Recurrent isolated sleep paralysis"
+   ],
+   [
+    "G47.54",
+    "Parasomnia in conditions classified elsewhere"
+   ],
+   [
+    "G47.59",
+    "Other parasomnia"
+   ],
+   [
+    "G47.61",
+    "Periodic limb movement disorder"
+   ],
+   [
+    "G47.62",
+    "Sleep related leg cramps"
+   ],
+   [
+    "G47.63",
+    "Sleep related bruxism"
+   ],
+   [
+    "G47.69",
+    "Other sleep related movement disorders"
+   ],
+   [
+    "G47.8",
+    "Other sleep disorders"
+   ]
+  ],
+  "hcpcs": [
+   [
+    "A4604",
+    "Tubing with integrated heating element for use with positive airway pressure device"
+   ],
+   [
+    "A7027",
+    "Combination oral/nasal mask, used with continuous positive airway pressure device, each"
+   ],
+   [
+    "A7030",
+    "Full face mask used with positive airway pressure device, each"
+   ],
+   [
+    "A7031",
+    "Face mask interface, replacement for full face mask, each"
+   ],
+   [
+    "A7034",
+    "Nasal interface (mask or cannula type) used with positive airway pressure device, with or without head strap"
+   ],
+   [
+    "A7035",
+    "Headgear used with positive airway pressure device"
+   ],
+   [
+    "A7036",
+    "Chinstrap used with positive airway pressure device"
+   ],
+   [
+    "A7037",
+    "Tubing used with positive airway pressure device"
+   ],
+   [
+    "A7038",
+    "Filter, disposable, used with positive airway pressure device"
+   ],
+   [
+    "A7039",
+    "Filter, non disposable, used with positive airway pressure device"
+   ],
+   [
+    "A7044",
+    "Oral interface used with positive airway pressure device, each"
+   ],
+   [
+    "A7046",
+    "Water chamber for humidifier, used with positive airway pressure device, replacement, each"
+   ],
+   [
+    "A7047",
+    "Oral interface used with respiratory suction pump, each"
+   ],
+   [
+    "A7049",
+    "Expiratory positive airway pressure intranasal resistance valve"
+   ],
+   [
+    "E0470",
+    "Respiratory assist device, bi-level pressure capability, without backup rate feature, used with noninvasive interface, e.g., nasal or facial mask (intermittent assist device with continuous positive airway pressure device)"
+   ],
+   [
+    "E0471",
+    "Respiratory assist device, bi-level pressure capability, with back-up rate feature, used with noninvasive interface, e.g., nasal or facial mask (intermittent assist device with continuous positive airway pressure device)"
+   ],
+   [
+    "E0472",
+    "Respiratory assist device, bi-level pressure capability, with backup rate feature, used with invasive interface, e.g., tracheostomy tube (intermittent assist device with continuous positive airway pressure device)"
+   ],
+   [
+    "E0561",
+    "Humidifier, non-heated, used with positive airway pressure device"
+   ],
+   [
+    "E0562",
+    "Humidifier, heated, used with positive airway pressure device"
+   ],
+   [
+    "E0601",
+    "Continuous positive airway pressure (cpap) device"
+   ],
+   [
+    "G8845",
+    "Positive airway pressure therapy prescribed"
+   ],
+   [
+    "G8849",
+    "Documentation of reason(s) for not prescribing positive airway pressure therapy (e.g., patient unable to tolerate, alternative therapies use, patient declined, financial, insurance coverage)"
+   ],
+   [
+    "G8850",
+    "Positive airway pressure therapy not prescribed, reason not given"
+   ],
+   [
+    "G8852",
+    "Positive airway pressure therapy was prescribed Terminated December 31, 2023."
+   ],
+   [
+    "G8853",
+    "Positive airway pressure therapy not prescribed Terminated December 31, 2016."
+   ]
+  ]
+ }
+}

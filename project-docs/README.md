@@ -4,7 +4,8 @@ Team docs for the MongoDB "Agents in Context" hackathon, Toronto, Nov 14 2026. T
 
 | File | What it is |
 |---|---|
-| [PLAN.md](PLAN.md) | **Start here.** Requirements, work split, researcher agents, timeline, risks. Awaiting approval. |
+| [COMBINED-PLAN.md](COMBINED-PLAN.md) | **Start here.** Combined plan (ours + Sukhman's): Python backend, React UI, work split, libraries, disagreements |
+| [PLAN.md](PLAN.md) | Earlier plan; §6 stack and split replaced by COMBINED-PLAN. Requirements, work split, researcher agents, timeline, risks. Awaiting approval. |
 | [hackathon-rules.md](hackathon-rules.md) | Rules, judging, prizes, deliverables, schedule |
 | [demo.md](demo.md) | What the demo must show; 1-minute video and 3-minute table script |
 | [design-and-decisions.md](design-and-decisions.md) | Architecture, the flow of one denial, key decisions and why, honest limits |

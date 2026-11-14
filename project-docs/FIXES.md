@@ -29,7 +29,7 @@ The tech lead ticks items off here when the PR that fixes them is merged.
 | P1 | C3 | `executor_loop(once=True)`: return when paused | `agent.py:49-51` | done: PR #6 |
 | P1 | C2 | Banner shows "Executed X of N" with N = `bulk.submitted`; demo with `RUN_BACKGROUND=0` | `static/index.html`, `.env` | done: PR #6 (banner; choose RUN_BACKGROUND on the day) |
 | P2 | — | `make bypass` also curls `/target/.../apply` (and compensate is gone) over HTTP | `eval/bypass.py` | todo |
-| P2 | — | `make e2e`: the honest path end to end, then suspend, compensate and check R6. Run it before every dry run. | `eval/`, `Makefile` | todo |
+| P2 | — | `make e2e`: the honest path end to end, then suspend, compensate and check R6. Run it before every dry run. | `eval/`, `Makefile` | done: PR #9 |
 | P2 | — | Missing `make burst-forged` (demo.md uses it); save `make test-conflict > docs/test-conflict.txt` | `Makefile` | todo |
 | P1 | A1 | `make smoke` exits 0 even on FAIL, and its watcher uses a fixed 1 s sleep (false FAIL). Exit non-zero on FAIL; wait for the stream to open | `pg/db.py:137-153` | todo |
 | P2 | A2 | `apply`: abort (don't consume the grant) if the record update matched 0; set snapshot and majority concerns | `target.py:29, 37` | todo |

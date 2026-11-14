@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
+.PHONY: ui demo-case e2e ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
 
 install:      ; pip install -r requirements-dev.txt
 smoke:        ; python -m pg.db --smoke
@@ -14,6 +14,12 @@ test:         ; pytest -q
 lint:         ; ruff check pg eval seed tests data
 rules:        ; curl -s "localhost:8080/rules?tenant=payer-acme" | python -m json.tool
 bypass:       ; python -m eval.bypass
+# Honest path end to end over HTTP, then a supervisor halt. Needs `make dev` running. Reseeds before and after.
+# Demo prep: one honestly reviewed, executed and confirmed case for the examiner (the fallback if a live review fails).
+# React UI on :4200 (proxies the API on :8080; run `make dev` too)
+ui:           ; npm --prefix ui install && npm --prefix ui run dev
+demo-case:    ; $(MAKE) seed && python -m eval.e2e --no-halt
+e2e:          ; $(MAKE) seed && python -m eval.e2e; s=$$?; $(MAKE) seed; exit $$s
 test-conflict:; DEMO_DEBUG_HOOKS=true python -m eval.test_conflict
 explain:      ; curl -s -H "X-Tenant-Id: payer-acme" localhost:8080/api/explain/window | python -m json.tool
 codes:        ; python -m data.pipeline.codes

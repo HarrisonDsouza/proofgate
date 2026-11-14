@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError, ruleName, secs, store, TENANT, type Policy, type QueueItem, type RunOnce, type Session } from '../api'
 import { useHeartbeat } from '../useHeartbeat'
 import { Notice, Spin, Title, type Tone } from '../ui'
+import { SpeakAttestation } from '../voice/SpeakAttestation'
 
 const REVIEWERS = ['dr-demo', 'dr-stamper', 'dr-skim', 'dr-cardio', 'dr-expired', 'vol-1', 'vol-2', 'vol-3']
 
@@ -34,6 +35,7 @@ export default function Review() {
   const [open, setOpen] = useState<{ eid: string; token: string; content: string } | null>(null)
   const [credited, setCredited] = useState<Record<string, number>>({})
   const [attest, setAttest] = useState('')
+  const [attId, setAttId] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
   const [result, setResult] = useState<Result | null>(null)
@@ -137,7 +139,8 @@ export default function Review() {
         await api(`/api/views/${open.token}/close`, {})
       }
       setOpen(null)
-      await api('/api/approvals', { proposal_id: picked.proposal_id, attestation_text: attest })
+      await api('/api/approvals', { proposal_id: picked.proposal_id, attestation_text: attest, attestation_id: attId ?? undefined })
+      setAttId(null)
       await runAgent(`Case ${picked.case_id}`, 1, picked.case_id)
     } catch (e) {
       setResult({ tone: 'bad', head: 'Approval refused', lines: [errText(e)], caseId: picked.case_id })
@@ -293,6 +296,14 @@ export default function Review() {
               <small>Counts only while this tab is visible and you have scrolled, clicked or typed in the last 15 s. The server confirms the time every 2 s; the browser cannot add time.</small>
             </div>
 
+            <SpeakAttestation
+              caseId={picked.case_id}
+              typedText={attest}
+              onAttested={(a) => {
+                setAttId(a.attestation_id)
+                setAttest(a.transcript)
+              }}
+            />
             <div className="sign">
               <label>
                 Attestation

@@ -22,15 +22,16 @@ pre{white-space:pre-wrap;font:12px ui-monospace,monospace;color:var(--quiet);max
 <main><div>
 <div id="banner" class="banner"></div>
 <section><h2>Queue (agent-proposed denials)</h2><div id="queue"></div></section>
-<section><h2>Supervisor</h2><div id="dash" class="meter"></div>
+<section><h2>Supervisor</h2><div id="dash" class="meter"></div><div id="ops" class="meter"></div>
 <div style="margin-top:8px"><input id="floor" size="6" value="60"> s floor <button id="setfloor">New policy version</button>
 <button id="halt">Halt reviewer</button></div></section></div>
 <div><section><h2>Case</h2><div id="case" class="meter">Pick a case. Open each cited evidence item; the server times it.</div>
 <textarea id="att" rows="2">I reviewed the cited evidence for this case.</textarea>
+<div style="margin-top:8px"><button id="speak">&#127908; Speak attestation</button> <span id="attmeta" class="meter">typed text is used if voice is unavailable</span></div>
 <div style="margin-top:8px"><button id="approve" class="primary">Approve denial</button></div><div id="res" class="meter"></div></section>
-<section><h2>Examiner replay</h2><input id="excase" placeholder="CLM-A-0001"><button id="ex">Rebuild case</button><pre id="exout"></pre></section></div></main>
+<section><h2>Examiner replay</h2><input id="excase" placeholder="CLM-A-0001"><button id="ex">Rebuild case</button> <button id="play">&#9654; Play voice receipt</button><pre id="exout"></pre></section></div></main>
 <script>
-const $=s=>document.querySelector(s);let S=null,P=null,TOK=null,lastInput=Date.now(),hbTimer=null;
+const $=s=>document.querySelector(s);let ATT=null,REC=null,S=null,P=null,TOK=null,lastInput=Date.now(),hbTimer=null;
 const H=()=>({'content-type':'application/json','X-Tenant-Id':$('#tenant').value,...(S?{'X-Session-Id':S}:{})});
 const api=(p,b)=>fetch(p,b?{method:'POST',headers:H(),body:JSON.stringify(b)}:{headers:H()}).then(r=>r.json());
 ['mousemove','keydown','scroll','click'].forEach(e=>addEventListener(e,()=>lastInput=Date.now()));
@@ -41,13 +42,30 @@ $('#login').onclick=async()=>{const r=await api('/api/sessions',{tenant_id:$('#t
 window.pick=id=>{P=Q.find(p=>p.proposal_id===id);$('#case').innerHTML=`<b>${P.case_id}</b> · ${P.summary}<br>${P.rationale}<br>codes ${P.codes.icd10.join(',')} / ${P.codes.hcpcs.join(',')} · $${P.billed_amount}`+P.all_evidence.map(e=>`<div class="ev" id="ev-${e.evidence_id}"><button onclick="openEv('${e.evidence_id}')">Open ${e.evidence_id}</button> ${e.label}${P.cited_evidence.some(c=>c.evidence_id===e.evidence_id)?' <b>(cited)</b>':''}<div class="meter" id="c-${e.evidence_id}"></div></div>`).join('')};
 window.openEv=async eid=>{const r=await fetch(`/api/cases/${P.case_id}/evidence/${eid}`,{headers:H()}).then(r=>r.json());TOK=r.view_token;document.querySelectorAll('.ev').forEach(x=>x.classList.remove('open'));$('#ev-'+eid).classList.add('open');$('#c-'+eid).textContent=r.content;
  clearInterval(hbTimer);hbTimer=setInterval(async()=>{const h=await api(`/api/views/${TOK}/heartbeat`,{visible:document.visibilityState==='visible',interacted_within_ms:Date.now()-lastInput});$('#c-'+eid).dataset.t=h.active_ms;$('#res').textContent=`${eid}: server-credited ${(h.active_ms/1000).toFixed(1)} s active, ${(h.idle_ms/1000).toFixed(1)} s idle`},5000)};
-$('#approve').onclick=async()=>{clearInterval(hbTimer);const a=await api('/api/approvals',{proposal_id:P.proposal_id,attestation_text:$('#att').value,dwell_ms:45000});
- const r=await api('/api/agent/run-once');banner(r.executed?`Executed ${r.executed} of ${r.submitted} · read back from the claims system`:`Executed 0 of ${r.submitted} · ${Object.entries(r.top_reasons).map(([k,v])=>k+' '+v).join(' · ')}`,!!r.executed);
+$('#speak').onclick=async()=>{
+ const b=$('#speak'),m=$('#attmeta');if(!P){m.textContent='pick a case first';return}
+ const send=async blob=>{const fb=$('#att').value.replace(/[^\x20-\x7e]/g,' ');
+  const r=await fetch('/api/voice/attest',{method:'POST',headers:{...H(),'content-type':'audio/webm','X-Case-Id':P.case_id,'X-Fallback-Text':fb},body:blob||new Blob([])});
+  const j=await r.json();if(!r.ok){m.textContent='attestation failed: '+(j.error||j.detail);return}
+  ATT=j.attestation_id;$('#att').value=j.transcript;
+  m.textContent=`${j.source==='elevenlabs_stt'?'spoken':'typed (voice unavailable)'} - specificity ${j.score.specificity}, boilerplate ${j.score.boilerplate}, score ${j.score.attestation_score}`+(j.score.unviewed_hits.length?` - names unopened evidence: ${j.score.unviewed_hits.join(', ')}`:'')};
+ if(REC){REC.stop();return}
+ try{const st=await navigator.mediaDevices.getUserMedia({audio:true}),ch=[];REC=new MediaRecorder(st);
+  REC.ondataavailable=e=>ch.push(e.data);REC.onstop=()=>{st.getTracks().forEach(t=>t.stop());REC=null;b.textContent='\u{1F3A4} Speak attestation';send(new Blob(ch,{type:'audio/webm'}))};
+  REC.start();b.textContent='\u23F9 Stop and save';m.textContent='recording... say what you checked'}
+ catch(e){m.textContent='no microphone: using the typed text';send(null)}};
+$('#play').onclick=async()=>{const r=await fetch('/api/voice/receipt/'+$('#excase').value,{headers:H()});
+ if(!r.ok){$('#exout').textContent='voice receipt unavailable: '+(await r.json()).detail;return}
+ new Audio(URL.createObjectURL(await r.blob())).play()};
+async function ops(){try{const o=await api('/api/ops');const g=o.gate_latency_ms;$('#ops').textContent=g?`gate p50 ${g.p50.toFixed(1)} ms - p95 ${g.p95.toFixed(1)} ms - n ${g.n} - detector lag ${(o.detector_lag_s?.p95??0).toFixed(2)} s`:''}catch(e){}}
+setInterval(()=>{if(S)ops()},5000);
+$('#approve').onclick=async()=>{clearInterval(hbTimer);const a=await api('/api/approvals',{proposal_id:P.proposal_id,attestation_text:$('#att').value,attestation_id:ATT,dwell_ms:45000});ATT=null;
+ const r=await api('/api/agent/run-once',{});banner(r.executed?`Executed ${r.executed} of ${r.submitted} · read back from the claims system`:`Executed 0 of ${r.submitted} · ${Object.entries(r.top_reasons).map(([k,v])=>k+' '+v).join(' · ')}`,!!r.executed);
  $('#res').textContent=`server dwell ${(a.active_dwell_ms/1000).toFixed(1)} s · client dwell_ms ignored: ${JSON.stringify(a.client_supplied_ignored)}`;$('#excase').value=P.case_id;loadQueue()};
 $('#bulk').onclick=async()=>{const ids=(await api('/api/queue?limit=50')).map(p=>p.proposal_id);await api('/api/approvals/bulk',{proposal_ids:ids,attestation_text:'Reviewed in batch.'});
- const r=await api('/api/agent/run-once');const d=await api('/api/dashboard');banner(`Executed: ${r.executed} of ${r.submitted} · ${Object.entries(r.top_reasons).map(([k,v])=>k+' '+v).join(' · ')} · Suspended: ${d.suspended_reviewers.join(', ')||'none'}`,false);loadQueue()};
+ const r=await api('/api/agent/run-once',{});const d=await api('/api/dashboard');banner(`Executed: ${r.executed} of ${r.submitted} · ${Object.entries(r.top_reasons).map(([k,v])=>k+' '+v).join(' · ')} · Suspended: ${d.suspended_reviewers.join(', ')||'none'}`,false);loadQueue()};
 $('#setfloor').onclick=async()=>{const r=await api('/api/policies',{action_type:'claim_denial',rules:{min_active_dwell_ms:+$('#floor').value*1000},rationale:'Raised floor live in the demo'});banner(`Policy v${r.version} active (was v${r.superseded_version}). The next gate call reads it.`,true)};
 $('#halt').onclick=async()=>{const r=await api('/api/suspensions',{reviewer_id:$('#who').value,reason:'SUPERVISOR_HALT'});banner(`Suspended ${$('#who').value}: ${r.grants_revoked} grants revoked, ${r.proposals_requeued} requeued, ${r.compensations_created} denials to reopen`,false);dash()};
-$('#ex').onclick=async()=>{const r=await api('/api/examiner/cases/'+$('#excase').value);$('#exout').textContent=JSON.stringify({proposal:r.proposal&&{agent:r.proposal.agent_id,rationale:r.proposal.rationale},views:r.views,approval:r.approval&&{reviewer:r.approval.reviewer_id,dwell_ms:r.approval.active_dwell_ms,ignored:r.approval.client_supplied_ignored},gate:r.gate_decisions.map(g=>({decision:g.decision,policy_version:g.policy_version,attempts:g.txn_attempts,failed:g.checks.filter(c=>!c.pass).map(c=>c.rule+': '+c.detail)})),denial:r.denial&&{status:r.denial.status,readback:r.denial.readback},target_log:r.target_log.map(t=>t.op+' '+t.outcome+' by '+t.caller),suspension:r.suspension&&{rule:r.suspension.rule,source:r.suspension.source},compensation:r.compensation&&r.compensation.status,chain:r.chain},null,2)};
+$('#ex').onclick=async()=>{const r=await api('/api/examiner/cases/'+$('#excase').value);$('#exout').textContent=JSON.stringify({proposal:r.proposal&&{agent:r.proposal.agent_id,rationale:r.proposal.rationale},views:r.views,attestation:r.attestation&&{source:r.attestation.source,transcript:r.attestation.transcript,score:r.attestation.score,flags:r.attestation.flags,audio_sha256:r.attestation.audio_sha256},approval:r.approval&&{reviewer:r.approval.reviewer_id,dwell_ms:r.approval.active_dwell_ms,ignored:r.approval.client_supplied_ignored},gate:r.gate_decisions.map(g=>({decision:g.decision,policy_version:g.policy_version,attempts:g.txn_attempts,failed:g.checks.filter(c=>!c.pass).map(c=>c.rule+': '+c.detail)})),denial:r.denial&&{status:r.denial.status,readback:r.denial.readback},target_log:r.target_log.map(t=>t.op+' '+t.outcome+' by '+t.caller),suspension:r.suspension&&{rule:r.suspension.rule,source:r.suspension.source},compensation:r.compensation&&r.compensation.status,chain:r.chain},null,2)};
 setInterval(()=>{if(S)dash()},3000);
 </script></body></html>

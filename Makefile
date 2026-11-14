@@ -17,8 +17,8 @@ bypass:       ; python -m eval.bypass
 test-conflict:; DEMO_DEBUG_HOOKS=true python -m eval.test_conflict
 explain:      ; curl -s -H "X-Tenant-Id: payer-acme" localhost:8080/api/explain/window | python -m json.tool
 codes:        ; python -m data.pipeline.codes
-calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live --floor 30
-calibrate-prd:      ; python -m eval.calibrate_detector --prd-model --floor 30
+calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live
+calibrate-prd:      ; python -m eval.calibrate_detector --prd-model
 eval:         ; python -m eval.simulate --seed 1
 eval-heldout: ; python -m eval.simulate --seed 20261114
 baseline:     ; python -m eval.simulate --seed 20261114 --baseline

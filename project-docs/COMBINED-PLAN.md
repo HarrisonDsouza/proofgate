@@ -16,7 +16,7 @@
 > - The backend is **Python** (no Spring Boot gate).
 > - The frontend is **React** (no Angular).
 >
-> So the stack and port lines in `README.md`, `WORKFLOW.md`, `prompts/*` and `project-docs/PLAN.md` §6 are out of date. They are updated in one follow-up PR (open question Q4). Everything else in those docs stands.
+> `README.md`, `WORKFLOW.md`, `CLAUDE.md`, `prompts/*` and `project-docs/*` have been updated to match (Q4 done). `project-docs/PLAN.md` §6 is superseded by this file. Everything else in those docs stands.
 
 > **Note:** the build plan and the zip are **not on GitHub yet**. `main` holds only the first commit. Importing the zip is step 0 below.
 
@@ -152,7 +152,7 @@ Browser ── React (Vite) dev server :4200 ──proxy /api /target /rules /me
 | D10 | Honest-reviewer model | Synthetic | Real volunteer sessions 13:00-14:30 | **Optional (Q2), only after 13:45 green, 14:00-14:45; `calibrate-prd` fallback** | 13:00-14:30 overlaps the core checkpoint |
 | D11 | Seed data | Synthetic codes; ortho/cardio/radiology | Real ICD-10-CM + HCPCS; sleep replaces radiology | **Sukhman's** | Real public-domain codes; the CPAP example works; still no CPT |
 | D12 | Pitch opener | PxDx 1.2 s | KFF Medicare Advantage figures | **KFF first, then PxDx with Cigna's dispute; both [VERIFY]** | Bigger, more neutral problem size; only after verification |
-| D13 | Simulated results in the plan | None | "96% drifters caught", "4.3% false suspensions" | **Never say them; regenerate today with `make eval`** | Rule: no number not produced today |
+| D13 | Simulated results in the plan | None | Simulated detection and false-suspension percentages | **Never quote them; show only numbers printed by `make eval`, `make rules` or `make test-conflict` today** | Rule: no number not produced today |
 | D14 | ElevenLabs | Neil: voiceover + spoken attestation | Skip | **Keep, contained (cut 3rd)** | Recorded decision; a separate prize; no core time |
 | D15 | LangSmith | Neil traces the agent | Only with the LLM rationale | **Neil traces the agent through the existing hook** | Recorded decision; the hook exists |
 | D16 | Roles | Harry A+C, Sukhman Spring, Neil LS/EL | A/B/C + Sukhman (data, volunteers, pitch) | **§2 split** | Three people; Python backend |
@@ -189,7 +189,7 @@ Browser ── React (Vite) dev server :4200 ──proxy /api /target /rules /me
 1. **Sukhman:** will you own the Python gate and detector live (§2)? Java isn't needed any more. If you'd rather do data, volunteers and the pitch, Harry takes the gate and the examiner page moves to the fallback UI.
 2. **Volunteer sessions** (5-10 people, 14:00-14:45, aliases only): yes or no?
 3. **Zip import:** OK for the orchestrator to import it through a PR now (step 0)?
-4. **Follow-up PR:** update `README.md`, `WORKFLOW.md`, `prompts/*`, `CLAUDE.md`, `project-docs/PLAN.md` §6 and `handoffs.md` to this plan?
+4. ~~Follow-up: align `README.md`, `WORKFLOW.md`, `prompts/*`, `CLAUDE.md` and `handoffs.md` with this plan.~~ Done on the `harry` branch; it reaches `main` with the plan's PR.
 5. **Feature freeze at 16:00** instead of 15:30 or 16:15: agreed?
 6. **Researchers:** start the five from `PLAN.md` §7 now, adding the KFF figures to R1's list?
 7. **Atlas:** is the sandbox cluster created, and which tier? Nothing runs until `make smoke` passes.

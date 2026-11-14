@@ -8,65 +8,66 @@ git checkout harry
 cp .env.example .env     # then fill MONGODB_URI (README "Sandbox setup" step 3)
 ```
 
-## What you own
+## What you own (COMBINED-PLAN §2)
 
-- **Engineer A (Python), in `py/`:**
-  - Atlas setup and the smoke test
-  - `setup_db` (collections, validators, indexes, TTL) and seed data
-  - the mock claims system (FastAPI :8000; refuses without a grant)
-  - the triage agent and executor loop
-  - rules R1-R8, the evaluation, the `test-conflict` script, reset
-  - `py/requirements.txt` and the `Makefile`
-- **Reduced Engineer C (Angular), in `ui/`:**
-  - the review page: evidence panel, heartbeats, Approve, the red "approve 50" button, the result banner
-  - the examiner page
-- PRD items: M1, M2, M3, M8, M9, M12, M13 (page), M14, M15, M16, M17.
+- **Atlas setup**: the sandbox cluster, `make smoke`.
+- **Data**: `pg/db.py` (validators, indexes, TTL), `seed/`, `data/`.
+- **Mock claims system**: `pg/target.py` (consume a grant, or 403).
+- **Agent**: `pg/agent.py` (triage + executor).
+- **Rules and examiner replay**: `pg/rules.py`.
+- **Evaluation**: `eval/simulate.py`, `eval/calibrate_detector.py`, `eval/bypass.py`, `docs/PREREGISTRATION.md`.
+- **React UI in `ui/`**: the reviewer page and the examiner page.
+- `Makefile`, `README.md`.
 
-Use two Claude Code sessions, one for `py/` and one for `ui/`, so two writers never touch the same files.
+Use two Claude Code sessions, one for the Python work and one for `ui/`, so two writers never touch the same files.
 
 ## First steps, in order
 
-1. **Atlas cluster in the hackathon sandbox:** README step 2. Then DM the connection string to Sukhman and Neil.
-2. Python session: paste the prompt below. The first output is `py/requirements.txt`, `py/db/smoke.py` and a `Makefile` with `smoke`.
-3. Run `make smoke`. Both the transaction and the change stream must PASS. If either fails, tell MongoDB staff immediately.
-4. `setup_db.py` + `seed/generate.py` → `make setup`. Open a PR. Mark handoff H2 `ready` for Sukhman.
-5. Then the mock claims system (H4) → executor → `make bypass`, before 13:45.
-6. UI session (from about 12:40): scaffold `ui/` with the proxy, and build the review page against mock JSON shaped like PRD §8.
+1. **Atlas cluster in the hackathon sandbox** (README step 2). DM the connection string to Sukhman and Neil.
+2. **`make install smoke`.** Both the transaction and the change stream must PASS. If either fails, tell MongoDB staff immediately.
+3. **`make setup seed`, then `make dev`, then `make bypass`.** You need two PASS lines. This is the 13:15 checkpoint.
+4. **UI session:** scaffold `ui/` with Vite + React + TypeScript, React Router and TanStack Query. Set the dev server to port 4200 with a proxy for `/api`, `/target`, `/rules` and `/metrics` to :8080. Build the reviewer page against the live API.
+5. **Agent and rules live**, then `make rules`. Mark handoff H5 `ready` for Neil.
+6. **Examiner page.** If time runs short, `static/` is the fallback.
+7. **Eval:** `make calibrate-prd` (or `calibrate-detector` if volunteers ran) → `make eval` → merge PREREGISTRATION → `make eval-heldout` **once** → `make baseline` → paste the output into the README unedited.
 
 ## Paste into Claude Code (Python session)
 
 ```
-You are helping a 3-person hackathon team build "ProofGate". Read CLAUDE.md, START-HERE.md and docs/PRD.md
-completely before writing code, then follow the PRD exactly (Section 7 data model, 8 architecture and API
-contract, 11 hour plan, 12 tests and eval). Also read README.md and WORKFLOW.md.
+You are helping a 3-person team build "ProofGate" at a MongoDB hackathon today. Read CLAUDE.md, README.md,
+WORKFLOW.md, project-docs/COMBINED-PLAN.md, project-docs/hackathon-rules.md and docs/HANDOFF.md first, then
+docs/PRD.md (behaviour spec). Precedence: COMBINED-PLAN -> HANDOFF -> PRD.
 
-My role: Engineer A (Python) - py/ : smoke test, setup_db, seed, target FastAPI (mock claims system),
-agent triage + executor, rules R1-R8, eval, test_conflict, reset, plus py/requirements.txt and the Makefile.
-I work on branch `harry` and only touch py/ (not py/voice/), Makefile, and docs/.
+My role (Harry): Atlas setup, data (pg/db.py, seed/, data/), the mock claims system (pg/target.py), the agent
+(pg/agent.py), rules + examiner replay (pg/rules.py), and evaluation (eval/ except test_conflict.py,
+docs/PREREGISTRATION.md). I work on branch `harry` and stay in those files. I ask before touching shared files
+(pg/main.py routes, pg/config.py, requirements, .env.example).
 
-Non-negotiable rules:
-1. MongoDB Atlas is the only state store; URI from env MONGODB_URI, DB from DB_NAME (load .env with
-   python-dotenv first). Never hard-code or commit secrets.
-2. Every document has tenant_id; every compound index leads with it; every query filters by it.
-3. The target applies a status change only by atomically consuming a valid grant in a transaction;
-   otherwise 403 + a target_log entry.
-4. Never invent results. Numbers come only from running make eval / make rules / Atlas queries.
-5. Build MUST items first, in the Section 11 order for Engineer A. Keep it simple: no Docker, no auth framework.
-6. After each piece, give me the exact command that proves it works against Atlas.
+Before building, check the hackathon must-dos in project-docs/hackathon-rules.md and the invariants in CLAUDE.md:
+Atlas sandbox only; tenant_id on every document and first in every compound index; the target changes a record
+only by atomically consuming a valid grant (else 403 + target_log); never invent results: numbers come only
+from make eval / make rules / make test-conflict / Atlas queries run today; never quote simulated numbers from
+planning docs. Do not rewrite working code: run it live, fix what fails.
 
-Start now: create py/requirements.txt, py/db/smoke.py (one multi-document transaction + one change-stream
-event, prints PASS/FAIL for each) and a Makefile with `smoke`. Then tell me what to run.
+Start now: walk me through `make install smoke` against the sandbox, then `make setup seed`, `make dev` and
+`make bypass`, fixing anything that fails. After each step, tell me the exact command that proves it worked.
 ```
 
-## Paste into Claude Code (UI session, from about 12:40)
+## Paste into Claude Code (UI session)
 
 ```
-Read CLAUDE.md, docs/PRD.md (Sections 6 M12-M13, 8 API contract, 13 demo), README.md and WORKFLOW.md.
-My role: reduced Engineer C (Angular) in ui/ only (not ui/src/app/voice/). Build only two pages: the review
-page (one case at a time, cited evidence buttons, heartbeat every 5 s only while the tab is visible and there
-was input in the last 15 s, attestation + Approve, the red "Select all, approve 50" button, a result banner
-polling /api/dashboard) and the examiner page /examiner/:caseId. Scaffold with Angular CLI, routing, CSS,
-and proxy.conf.json (/api -> :8080, /py -> :8000 with pathRewrite /py -> ""). Start against mock JSON
-shaped exactly like PRD Section 8, then switch to the real API when Sukhman's endpoints land on main.
-Never compute or send dwell time from the browser.
+Read CLAUDE.md, README.md, WORKFLOW.md, project-docs/COMBINED-PLAN.md (sections 1, 4, 5) and docs/PRD.md
+(M12, M13, Section 8 API contract, Section 13 demo). My role: the React UI in ui/ only (not ui/src/voice/).
+
+Build with Vite + React + TypeScript, React Router (routes /review and /examiner/:caseId) and TanStack Query
+(1 s polling of /api/dashboard). Dev server on port 4200, proxying /api, /target, /rules and /metrics to
+http://localhost:8080. Plain CSS reusing the variables in static/index.html; text >= 16 px; red only for
+refused/suspended, green only for executed and read back.
+
+Reviewer page: one case at a time; cited evidence buttons (GET /api/cases/{id}/evidence/{eid}); a heartbeat
+every 5 s only while the tab is visible and there was key/pointer input in the last 15 s (Page Visibility
+API); show the server's credited time, never compute or send dwell from the browser; attestation text +
+Approve; the red "Select all, approve 50" button; the result banner. Examiner page: the timeline from
+GET /api/examiner/cases/{id}. Keep static/index.html working as the fallback. Start with the scaffold and
+the reviewer page against the live API, and tell me how to check each piece.
 ```

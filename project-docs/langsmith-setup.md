@@ -51,7 +51,7 @@ Our agent is rules-based (PRD M3) and has no LLM unless we build S6. Tracing sti
 
 ## Wiring into the agent (handoff from Harry, after the agent code exists)
 
-Harry writes `py/agent/triage.py` and `py/agent/executor.py`. Once they run, Neil adds tracing:
+The agent lives in `pg/agent.py` (Harry), and `pg/observability.py` already has a LangSmith wrapper. Once the agent runs live, Neil adds tracing (through that wrapper):
 - `@traceable(name="triage_one")` on the function that writes one proposal.
 - `@traceable(name="execute_one")` on the function that handles one approved proposal. Nested calls go inside it:
   - `@traceable(name="gate_execute")` around the HTTP call to `POST /api/gate/execute`

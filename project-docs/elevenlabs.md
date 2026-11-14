@@ -28,7 +28,7 @@
 ## Option 2 design (deliberately minimal)
 
 1. The review page gets a **"Speak attestation"** button. The browser records audio with the standard MediaRecorder API.
-2. The browser posts the audio to **our Python service**, at a new route such as `POST /voice/attest`.
+2. The browser posts the audio to **our Python service**, at a new route `POST /api/voice/attest` (`pg/voice.py`).
    - **The ElevenLabs key never goes to the browser.** Only the server calls ElevenLabs.
 3. The server calls ElevenLabs speech-to-text and writes a new `attestations` document:
    - fields: `tenant_id, attestation_id, session_id, reviewer_id, case_id, transcript, audio_sha256, stt_model, created_at`
@@ -38,8 +38,8 @@
 6. Fallback: if speech-to-text fails, the reviewer types the attestation as today.
 
 **Handoffs this needs.** All of these happen after 13:45, and only if the core is green:
-- Sukhman: accept `attestation_id` on `POST /api/approvals`, and show it in the examiner API. About 20 lines.
-- Harry: add the `attestations` validator and index to `setup_db.py`, and place Neil's Angular button component on the review page.
+- Sukhman (owner of `pg/review.py`): accept `attestation_id` on `POST /api/approvals`. Harry (owner of `pg/rules.py`): show it in the examiner replay. About 20 lines.
+- Harry: add the `attestations` validator and index to `pg/db.py`, and place Neil's React button component (`ui/src/voice/`) on the reviewer page.
 
 ## Steps for Neil
 
@@ -49,7 +49,7 @@
 4. Spike A, text-to-speech: generate one line of the video script to an mp3 and listen to it.
 5. Spike B, speech-to-text: transcribe a 10-second phone recording.
    - Try model `scribe_v2` first and fall back to `scribe_v1`. The exact model ids are [VERIFY]; the researcher agent will confirm them.
-6. After 13:45: build `/voice/attest` and the Angular button, then hand off as above.
+6. After 13:45: build `/api/voice/attest` and the React button, then hand off as above.
 7. From 15:30: generate the final video voiceover from the agreed script.
 
 ## Cut rule

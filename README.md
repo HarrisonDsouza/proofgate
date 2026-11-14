@@ -7,112 +7,121 @@
 - The mock claims system refuses anything without a grant.
 - Clicking "approve 50" executes 0, and the reviewer is suspended mid-run.
 
-Built today at the MongoDB "Agents in Context" hackathon, Toronto, Nov 14 2026. Entry: **Statement One, Agents You Can Audit.** Synthetic data only; not a medical tool.
+Built today at the MongoDB "Agents in Context" hackathon, Toronto, Nov 14 2026. Entry: **Statement One, Agents You Can Audit.** Synthetic cases built on real public-domain ICD-10-CM and HCPCS codes; not a medical tool.
 
 **New here? Read in this order:**
 1. This README.
-2. [WORKFLOW.md](WORKFLOW.md).
-3. Your prompt in [prompts/](prompts/).
-4. [START-HERE.md](START-HERE.md).
-5. [docs/PRD.md](docs/PRD.md), the build spec.
+2. [project-docs/COMBINED-PLAN.md](project-docs/COMBINED-PLAN.md): the plan, the work split, and the libraries to use.
+3. [WORKFLOW.md](WORKFLOW.md).
+4. Your prompt in [prompts/](prompts/).
+5. [project-docs/hackathon-rules.md](project-docs/hackathon-rules.md): the must-dos.
+6. [docs/PRD.md](docs/PRD.md): the behaviour spec.
 
-The plan, demo, design and judge Q&A are in [project-docs/](project-docs/README.md).
+**Precedence:** COMBINED-PLAN → `docs/HANDOFF.md` → PRD.
 
 ## Team
 
 | Person | Owns | Folders | Prompt |
 |---|---|---|---|
-| Harry | Atlas setup, data, mock claims system, agent, rules, evaluation, plus the review and examiner pages | `py/`, `ui/`, `Makefile` | [prompts/HARRY.md](prompts/HARRY.md) |
-| Sukhman | The gate service (Spring Boot): views, approvals, the gate transaction, suspensions, detector, examiner API | `gate/` | [prompts/SUKHMAN.md](prompts/SUKHMAN.md) |
-| Neil | LangSmith tracing and ElevenLabs (video voiceover, spoken attestation) | `py/voice/`, `ui/src/app/voice/` | [prompts/NEIL.md](prompts/NEIL.md) |
+| Harry | Atlas setup, data, mock claims system, agent, rules, evaluation, React reviewer + examiner pages | `pg/db.py`, `pg/target.py`, `pg/agent.py`, `pg/rules.py`, `seed/`, `data/`, `eval/` (except `test_conflict.py`), `ui/` (except `ui/src/voice/`), `Makefile`, `README.md` | [prompts/HARRY.md](prompts/HARRY.md) |
+| Sukhman *(role to confirm)* | Gate and detector working live: review flow, gate transaction, suspensions, conflict test, detector kill/restart; data notes and pitch figures | `pg/review.py`, `pg/checks.py`, `pg/gate.py`, `pg/detector.py`, `pg/cusum.py`, `pg/riskcontrol.py`, `pg/stats.py`, `eval/test_conflict.py`, `docs/DATA.md` | [prompts/SUKHMAN.md](prompts/SUKHMAN.md) |
+| Neil | LangSmith tracing and ElevenLabs (video voiceover, optional spoken attestation) | `pg/voice.py`, `pg/observability.py` (tracing lines), `ui/src/voice/` | [prompts/NEIL.md](prompts/NEIL.md) |
 
 ## How the parts connect
 
 ```
-Browser  ui/ (Angular, :4200)
-   │ /api ──────────────► gate/ (Spring Boot, :8080) ──┐
-   │ /py  ──► py/ (FastAPI, :8000)                     │
-            mock claims system, rules, voice           ├──► MongoDB Atlas (all state)
-            py/agent: triage + executor ─► gate ─► claims system
-            gate/ "detector" profile: change stream ───┘
+Browser ── React (Vite) :4200 ──proxy /api /target /rules /metrics──┐
+           fallback UI: static/index.html at :8080/                 ▼
+                                    FastAPI pg.main :8080 (one Python process)
+                                      reviewer API, gate transaction, mock claims system (/target),
+                                      agent, rules + examiner, detector (thread, or `make detector`)
+                                                     │
+                                    MongoDB Atlas Hackathon Sandbox (all state)
 ```
 
-Nobody's code talks to another person's code except through the HTTP API shapes in **PRD §8**. That is the contract between us.
+The HTTP API shapes in **PRD §8** are the contract between the backend and the UI.
+
+> **Status:** the Python backend (`pg/`, `seed/`, `eval/`, `Makefile`) comes from Sukhman's code and is being imported. The `make` commands below work once that import PR is merged to `main`.
 
 ---
 
 ## Sandbox setup (do these in order)
 
-### Step 1. Install the tools for your part
+### Step 1. Install the tools
 
-| Tool | Who needs it | Check |
+| Tool | Who | Check |
 |---|---|---|
-| git + a GitHub account with access to this repo | everyone | `git --version` |
-| Python 3.11+ | Harry, Neil | `python3 --version` |
-| Node 22.13+ | Harry, Neil (UI) | `node -v` |
-| Java 21 + Maven | Sukhman | `java -version` shows 21 (on a Mac, run `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` first if it shows 1.8) |
+| git + a GitHub account added to this repo | everyone | `git --version` |
+| Python 3.11+ | everyone | `python3 --version` |
+| Node 22.13+ | Harry, Neil | `node -v` |
 | Claude Code | everyone | `claude --version` |
 
 ### Step 2. The Atlas cluster (Harry does this once for the team)
 
 > **It must be the MongoDB Atlas Hackathon Sandbox** from the organisers' invite email (org "Agents in Context Toronto"). A personal or free Atlas account makes the team **ineligible as a finalist**.
 
-1. Open the invite email link, then the hackathon organisation, then our project.
+1. Open the invite email link → the hackathon organisation → our project.
 2. Create the cluster **in that project**. If you can choose, avoid M0: shared tiers throttle operations.
-3. **Network Access → Add Current IP.** Teammates on the venue Wi-Fi usually share that IP. If someone can't connect, add their IP, or for the venue only add `0.0.0.0/0` and remove it after the event.
+3. **Network Access → Add Current IP.** Teammates on the venue Wi-Fi usually share it. If someone can't connect, add their IP, or for the venue only add `0.0.0.0/0` and remove it after the event.
 4. **Database Access → Add user** `gate_app` with password auth and readWrite on `proofgate`.
 5. **Connect → Drivers → copy** the `mongodb+srv://...` string. If the password has special characters, URL-encode them.
-6. Send that string to Sukhman and Neil by **private DM only**. Never put it in git, an issue, a PR or a chat with an AI.
+6. Send it to Sukhman and Neil by **private DM only**. Never put it in git, an issue, a PR or a chat with an AI.
 
 ### Step 3. Your local `.env` (everyone)
 
-From the repo root:
-```bash
-cp .env.example .env
-```
-Edit `.env`:
+From the repo root, run `cp .env.example .env`, then edit `.env`:
 - `MONGODB_URI`: the string from step 2.
 - `DB_NAME=proofgate`.
-- Keep the defaults for `GATE_URL`, `TARGET_URL`, `AGENT_SERVICE_KEY` and `DEMO_DEBUG_HOOKS`. They must be the same on every machine.
+- `GATE_URL=http://localhost:8080` and `TARGET_URL=http://localhost:8080`. It's one process.
+- Keep `AGENT_SERVICE_KEY`, `DEMO_DEBUG_HOOKS=true` and `RUN_BACKGROUND=1` the same on every machine.
 - Neil also fills `LANGSMITH_*` and `ELEVENLABS_API_KEY`.
 
 `.env` is git-ignored. Check with `git status`: it must never appear.
 
-### Step 4. Prove the cluster works (Harry, first task)
+### Step 4. Install and prove the cluster works
 
-Harry's first code is `py/db/smoke.py` (`make smoke`). It runs one multi-document transaction and catches one change-stream event. **If either fails, ask MongoDB staff for a different tier immediately.** The whole design depends on both.
-
-When it passes, Harry runs `make setup` to create the collections, validators, indexes and seed data. Everyone can then see `proofgate` in Atlas → Browse Collections.
-
-### Step 5. Run your part locally
-
-Each part exists once its owner has pushed it to `main` (see WORKFLOW.md). Load `.env` first in every terminal:
 ```bash
-set -a; source .env; set +a
+python3 -m venv .venv && source .venv/bin/activate
+make install          # Python dependencies
+make smoke            # must print PASS for the transaction AND the change stream
 ```
 
-| Part | Owner | First-time install | Run |
-|---|---|---|---|
-| Python (target, rules, agent) | Harry | `python3 -m venv .venv && source .venv/bin/activate && pip install -r py/requirements.txt` | `uvicorn py.target.app:app --port 8000` · agent: `python -m py.agent.executor` |
-| Gate | Sukhman | `cd gate && mvn -q -DskipTests package` | `cd gate && mvn spring-boot:run -Dspring-boot.run.profiles=gate` |
-| Detector (same jar) | Sukhman | (as above) | `cd gate && mvn spring-boot:run -Dspring-boot.run.profiles=detector` |
-| UI | Harry | `cd ui && npm install` | `cd ui && npx ng serve --proxy-config proxy.conf.json` → http://localhost:4200 |
+**If either check fails, ask MongoDB staff for a different tier immediately.** The whole design depends on both.
 
-The `Makefile` wraps these as `make target`, `make gate`, `make detector`, `make agent` and `make ui` once Harry adds it.
+Harry then runs `make setup seed` once for the team: collections, validators, indexes, seed data. Afterwards everyone can see `proofgate` in Atlas → Browse Collections.
+
+### Step 5. Run it locally
+
+The `Makefile` loads `.env` for you.
+
+| What | Command | Where |
+|---|---|---|
+| Backend (API, gate, claims system, detector thread, fallback UI) | `make dev` | http://localhost:8080 |
+| Detector as its own process (kill/restart demo) | set `RUN_BACKGROUND=0` in `.env`, then `make detector` in a second terminal | - |
+| React UI (once `ui/` exists) | `cd ui && npm install && npm run dev` | http://localhost:4200 |
+| Tests and lint (before every PR) | `make test lint` | - |
 
 ### Step 6. End to end
 
-1. Start the parts in this order: target (:8000) → gate (:8080) → detector → agent → UI (:4200).
-2. Open http://localhost:4200.
-3. Check that it all connects:
-   - `curl -s localhost:8000/rules?tenant=payer-acme` returns JSON.
+1. Start `make dev`. Then optionally start the React UI.
+2. Check that it all connects:
+   - `make bypass` prints two PASS lines: no grant → 403, fake grant → 403.
+   - `make rules` prints R1-R8 JSON.
    - `curl -s -H 'X-Tenant-Id: payer-acme' localhost:8080/api/queue` returns proposals.
-   - The UI shows the queue.
+3. Run the demo checks in the UI:
+   - as `dr-stamper`, "Select all, approve 50" → executed 0, reviewer suspended
+   - as `dr-demo`, open each cited item, approve → executed and read back
+
+## Results
+
+Filled **only** from `make eval-heldout`, `make baseline`, `make test-conflict` and `make rules` run today, pasted unedited.
+
+_pending_
 
 ## Rules everyone follows
 
-- Atlas is the only state store. Every document has `tenant_id`.
+- Atlas sandbox is the only state store. Every document has `tenant_id`.
 - Never commit secrets: no `.env` and no keys.
 - All code is written today. Copy nothing from other projects.
-- Never invent results. Every number in the README, video or pitch comes from `make eval`, `make rules` or an Atlas query run today.
-- Build all MUST items (PRD §6) before anything else.
+- **Never invent results.** Every number in the README, video or pitch comes from `make eval`, `make rules`, `make test-conflict` or an Atlas query run today.
+- MUST items first (PRD §6), using the cut order in COMBINED-PLAN §3.

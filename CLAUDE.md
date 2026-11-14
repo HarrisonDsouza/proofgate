@@ -2,6 +2,13 @@
 
 You are helping a 3-person team build **ProofGate** at the MongoDB "Agents in Context" hackathon in Toronto, **today, Saturday Nov 14, 2026**. Submissions close at **5:00 PM EST**. Every decision below was already made in an earlier planning session; do not reopen them unless the user asks.
 
+## Current plan (overrides where it differs)
+`project-docs/COMBINED-PLAN.md` is the team plan. Precedence: COMBINED-PLAN → `docs/HANDOFF.md` → `docs/PRD.md`.
+- The backend is **one Python FastAPI process** (`pg/`, from Sukhman's code), not Spring Boot.
+- The UI is **React (Vite + TypeScript)** in `ui/`, not Angular, with `static/index.html` as the fallback.
+- The PRD still defines behaviour: gate rules, data model, API contract, evaluation and demo. Where the sections below mention Engineer A/B/C, Spring or Angular, read them through COMBINED-PLAN §2.
+- **Never quote simulated results from any planning document.**
+
 ## Read before writing any code
 1. `START-HERE.md`: what the project is, the minimum core, and today's order of work.
 2. `docs/PRD.md`: **the build spec. Follow it exactly.** Section 7 = data model, 8 = architecture and API contract, 11 = hour plan, 12 = evaluation and tests, 13 = demo, 14 = judge Q&A, 16 = submission checklist, 17 = per-engineer first prompt.

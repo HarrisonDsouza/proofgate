@@ -30,12 +30,20 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - **13:07** Neil's tools research is in ([research/neil-tools.md](research/neil-tools.md)): use `scribe_v3`, then `scribe_v2`; LangSmith redaction hooks are confirmed; no ElevenLabs prize criteria are published. Fixed elevenlabs.md and langsmith-setup.md to match.
 - **13:07** Baseline code review is in: **FAIL** ([research/code-review-baseline.md](research/code-review-baseline.md)). Security review and code review merged into one owner-by-owner list: [FIXES.md](FIXES.md).
 - **13:08** Atlas-tier research is in ([research/atlas-tier.md](research/atlas-tier.md)): transactions and change streams work on Free, Flex and M10; every in-transaction operation passes the session; the smoke test's exit code can't be trusted. Rows A1-A3 added to FIXES.md. All six agents are done.
+- **13:39** Atlas is live: an M10 cluster in the hackathon sandbox project. On it:
+  - `make smoke`: PASS (transaction and change stream)
+  - `make setup` and `make seed`: 200 cases, 123 proposed denials (setup re-runs fine, so the role is OK)
+  - `make bypass`: 3 PASS (no grant → 403, made-up grant → 403, record unchanged)
+  - `make test-conflict`: (a), (b) and (c) all PASS, including the forged burst executing 0 of 50
+  - `/rules`: R1-R8 all pass
+  - the API starts with the new keys, and `/api/sessions` without the console key returns 401
+  - **Note:** each gate call takes about 1.7 s from this laptop, so a 50-item burst takes about 90 s; the demo plan should allow for it.
 
 ## Checkpoints
 
 | Time | Checkpoint | Status |
 |---|---|---|
-| 13:15 | smoke, setup and seed on the sandbox; `make bypass` PASS | blocked: no Atlas cluster yet |
+| 13:15 | smoke, setup and seed on the sandbox; `make bypass` PASS | **met at 13:39** (late) |
 | 13:45 | core demo works; tag `core-ok` | |
 | 14:30 | PREREGISTRATION merged before the held-out eval | |
 | 16:00 | feature freeze | |

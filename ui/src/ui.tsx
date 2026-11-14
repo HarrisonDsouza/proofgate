@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { LoaderCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { api, type Dashboard } from './api'
 
@@ -13,6 +14,10 @@ export function Title({ title, sub, children }: { title: string; sub: string; ch
       {children}
     </header>
   )
+}
+
+export function Spin({ label }: { label?: string }) {
+  return <LoaderCircle className="spin" aria-hidden={!label} aria-label={label} />
 }
 
 export type Tone = 'good' | 'bad' | 'info'
@@ -46,7 +51,7 @@ export function Notice({ tone, head, lines = [], stamp, action }: {
 }
 
 export function useDashboard() {
-  return useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>('/api/dashboard'), refetchInterval: 2000 })
+  return useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>('/api/dashboard'), refetchInterval: 3000, refetchOnWindowFocus: false })
 }
 
 export function Tally() {

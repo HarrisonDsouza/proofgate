@@ -178,9 +178,9 @@ label.field { display: grid; gap: 6px; font: 500 13px var(--sans); color: var(--
 .doc .time { display: flex; justify-content: space-between; align-items: baseline; font: 500 12.5px var(--mono); color: var(--ink-3); }
 .doc.met .time b { color: var(--proof); }
 .ticks { position: relative; height: 8px; background: repeating-linear-gradient(90deg, rgba(27, 26, 23, 0.22) 0 1px, transparent 1px 6px); }
-.ticks i { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 6px); transition: width 600ms var(--ease); }
+.ticks i { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 6px); transition: width 0.2s linear; }
 .met .ticks i, .ticks.met i { background: repeating-linear-gradient(90deg, var(--proof) 0 2px, transparent 2px 6px); }
-.reader { margin: 0; white-space: pre-wrap; font: 13.5px/1.65 var(--mono); padding: 18px 20px; max-height: 260px; overflow: auto;
+.reader { margin: 0; white-space: pre-wrap; font: 16px/1.6 var(--sans); padding: 18px 20px; max-height: 260px; overflow: auto;
   background: var(--sheet); border: 1px solid var(--rule); border-top: 2px solid var(--ink); }
 
 .tallyline { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; padding-top: 14px; border-top: 2px solid var(--ink); }
@@ -259,4 +259,15 @@ blockquote { margin: 10px 0; padding: 0 0 0 16px; border-left: 1px solid var(--i
   .entry .body { grid-column: 1 / -1; }
   .sign { grid-template-columns: 1fr; }
 }
+/* loading and live-timer states */
+.spin { width: 1em; height: 1em; vertical-align: -0.15em; animation: spin 0.9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn .spin { margin-right: 2px; }
+.paused { color: var(--red); display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.paused svg, .pausenote svg { width: 14px; height: 14px; }
+.pausenote { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 10px 14px; border-left: 3px solid var(--red);
+  background: var(--sheet); color: var(--ink); font-size: 15px; }
+.doc[aria-busy='true'] { opacity: 1; }
+.doc:disabled { cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: spin 2.4s linear infinite !important; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

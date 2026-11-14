@@ -1,10 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Stamp } from 'lucide-react'
+import { ArrowRight, Pause, Stamp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, ruleName, secs, store, TENANT, type Policy, type QueueItem, type RunOnce, type Session } from '../api'
 import { useHeartbeat } from '../useHeartbeat'
-import { Notice, Title, type Tone } from '../ui'
+import { Notice, Spin, Title, type Tone } from '../ui'
 
 const REVIEWERS = ['dr-demo', 'dr-stamper', 'dr-skim', 'dr-cardio', 'dr-expired', 'vol-1', 'vol-2', 'vol-3']
 
@@ -35,6 +35,7 @@ export default function Review() {
   const [credited, setCredited] = useState<Record<string, number>>({})
   const [attest, setAttest] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const [opening, setOpening] = useState<string | null>(null)
   const [result, setResult] = useState<Result | null>(null)
 
   const policy = useQuery({ queryKey: ['policy'], queryFn: () => api<Policy[]>('/api/policies') })
@@ -48,15 +49,22 @@ export default function Review() {
     enabled: !!session,
   })
 
-  const beat = useHeartbeat(open?.token ?? null)
+  const { live, flush } = useHeartbeat(open?.token ?? null)
+  const liveServer = live?.serverMs
   useEffect(() => {
-    if (open && beat) setCredited((c) => ({ ...c, [open.eid]: beat.active_ms }))
-  }, [beat, open])
+    // Only apply a heartbeat to the document it belongs to (the token check), never to the next one opened.
+    if (open && live && live.token === open.token) setCredited((c) => (c[open.eid] === live.serverMs ? c : { ...c, [open.eid]: live.serverMs }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveServer, open?.token])
+  const shown = (eid: string) => {
+    const base = credited[eid]
+    if (!opening && open?.eid === eid && live && live.token === open.token) return Math.max(base ?? 0, live.shownMs)
+    return base
+  }
 
-  const total = Object.values(credited).reduce((a, b) => a + b, 0)
+  const total = Object.keys(credited).reduce((a, k) => a + (shown(k) ?? 0), 0)
   const cited = picked?.cited_evidence ?? []
-  const openedCited = cited.filter((e) => credited[e.evidence_id] !== undefined).length
-  const ready = cited.length > 0 && total >= floor && cited.every((e) => (credited[e.evidence_id] ?? 0) >= itemFloor)
+  const ready = cited.length > 0 && total >= floor && cited.every((e) => (shown(e.evidence_id) ?? 0) >= itemFloor)
 
   async function start() {
     setBusy('session')
@@ -85,13 +93,20 @@ export default function Review() {
   }
 
   async function openEvidence(eid: string) {
-    if (!picked) return
+    if (!picked || opening || open?.eid === eid) return
+    setOpening(eid)
     try {
+      if (open) {
+        const ms = await flush() // credit the time since the last heartbeat before the server closes this view
+        if (ms != null) setCredited((c) => ({ ...c, [open.eid]: Math.max(c[open.eid] ?? 0, ms) }))
+      }
       const r = await api<{ view_token: string; content: string }>(`/api/cases/${picked.case_id}/evidence/${eid}`)
       setCredited((c) => ({ ...c, [eid]: c[eid] ?? 0 }))
       setOpen({ eid, token: r.view_token, content: r.content })
     } catch (e) {
       setResult({ tone: 'bad', head: 'Could not open that document', lines: [errText(e)] })
+    } finally {
+      setOpening(null)
     }
   }
 
@@ -117,7 +132,10 @@ export default function Review() {
     if (!picked) return
     setBusy('approve')
     try {
-      if (open) await api(`/api/views/${open.token}/close`, {})
+      if (open) {
+        await flush()
+        await api(`/api/views/${open.token}/close`, {})
+      }
       setOpen(null)
       await api('/api/approvals', { proposal_id: picked.proposal_id, attestation_text: attest })
       await runAgent(`Case ${picked.case_id}`, 1, picked.case_id)
@@ -169,6 +187,7 @@ export default function Review() {
           </select>
         </label>
         <button className="btn ink" onClick={start} disabled={busy === 'session'}>
+          {busy === 'session' && <Spin />}
           {session ? 'New session' : 'Start session'}
         </button>
         {session && (
@@ -179,6 +198,7 @@ export default function Review() {
         )}
         <span className="spacer" />
         <button className="btn redline" onClick={bulk} disabled={!session || !!busy} title="The rubber-stamp button. The gate refuses it.">
+          {busy === 'bulk' && <Spin />}
           Select all · approve 50
         </button>
       </div>
@@ -187,6 +207,7 @@ export default function Review() {
         <div className="queue">
           <h2 className="section">Queue{queue.data ? <span className="subtle" style={{ font: '400 14px var(--sans)', marginLeft: 8 }}>{queue.data.length} cases</span> : null}</h2>
           {!session && <p className="empty">Start a session to see the cases routed to your specialty.</p>}
+          {queue.isLoading && <p className="empty"><Spin /> Loading cases from Atlas…</p>}
           {queue.isError && <p className="empty red">{errText(queue.error)}</p>}
           {queue.data?.length === 0 && <p className="empty">Nothing awaiting review.</p>}
           {!!queue.data?.length && (
@@ -223,41 +244,53 @@ export default function Review() {
 
             <div>
               <h2 className="section">
-                Documents <span className="subtle" style={{ font: '400 14px var(--sans)', marginLeft: 6 }}>{openedCited} of {cited.length} cited opened</span>
+                Documents <span className="subtle" style={{ font: '400 14px var(--sans)', marginLeft: 6 }}>{cited.filter((e) => (shown(e.evidence_id) ?? 0) >= itemFloor).length} of {cited.length} required documents read ({secs(itemFloor)} each)</span>
               </h2>
               <div className="docs">
                 {picked.all_evidence.map((e) => {
                   const isCited = cited.some((c) => c.evidence_id === e.evidence_id)
-                  const ms = credited[e.evidence_id]
+                  const ms = shown(e.evidence_id)
                   const met = ms !== undefined && ms >= itemFloor
+                  const isOpen = open?.eid === e.evidence_id
+                  const isOpening = opening === e.evidence_id
                   return (
-                    <button key={e.evidence_id} className={`doc ${open?.eid === e.evidence_id ? 'open' : ''} ${met ? 'met' : ''}`} onClick={() => openEvidence(e.evidence_id)}>
+                    <button key={e.evidence_id} className={`doc ${isOpen ? 'open' : ''} ${met ? 'met' : ''}`} onClick={() => openEvidence(e.evidence_id)} disabled={!!opening && !isOpening} aria-busy={isOpening}>
                       <span className="top">
                         <span className="eid">{e.evidence_id}</span>
-                        {isCited && <span className="tag red">cited</span>}
+                        {isCited && <span className="tag red" title="The agent based its denial on this document. You must read it.">required</span>}
                       </span>
                       <span className="label">{e.label}</span>
                       <span className="ticks" aria-hidden>
                         <i style={{ width: `${Math.min(100, ((ms ?? 0) / itemFloor) * 100)}%` }} />
                       </span>
                       <span className="time">
-                        <span>{ms === undefined ? 'not opened' : open?.eid === e.evidence_id ? 'reading' : 'opened'}</span>
+                        <span>
+                          {isOpening ? <><Spin /> opening…</> : ms === undefined ? 'not opened' : isOpen ? (!live || live.counting ? 'reading' : <span className="paused"><Pause aria-hidden /> paused</span>) : met ? 'done' : 'opened'}
+                        </span>
                         <b>{ms === undefined ? '' : secs(ms)}</b>
                       </span>
                     </button>
                   )
                 })}
               </div>
-              {open && <pre className="reader" style={{ marginTop: 14 }}>{open.content}</pre>}
+              {open && !opening && live && !live.counting && (
+                <p className="pausenote" role="status">
+                  <Pause aria-hidden /> Timer paused. Scroll, click or type to keep counting: the server only credits time while you are using this tab.
+                </p>
+              )}
+              {open && <div className="reader" style={{ marginTop: 14 }}>{open.content}</div>}
             </div>
 
             <div className="tallyline" aria-label="Server-credited review time">
               <span className={`big ${total >= floor ? 'met' : ''}`}>{secs(total)}</span>
-              <span className="of">credited by the server · policy floor {secs(floor)}</span>
+              <span className="of">
+                review time · policy floor {secs(floor)}
+                {live?.pending && <> · <Spin /> saving to Atlas</>}
+              </span>
               <span className={`ticks ${total >= floor ? 'met' : ''}`} aria-hidden>
                 <i style={{ width: `${Math.min(100, (total / floor) * 100)}%` }} />
               </span>
-              <small>Counted only while this tab is visible and you have used it in the last 15 s. The browser cannot add time.</small>
+              <small>Counts only while this tab is visible and you have scrolled, clicked or typed in the last 15 s. The server confirms the time every 2 s; the browser cannot add time.</small>
             </div>
 
             <div className="sign">
@@ -270,8 +303,7 @@ export default function Review() {
                 />
               </label>
               <button className="btn ink lg" onClick={approve} disabled={!!busy}>
-                <Stamp aria-hidden />
-                {busy === 'approve' ? 'Checking in Atlas…' : 'Approve denial'}
+                {busy === 'approve' ? <><Spin /> Checking in Atlas…</> : <><Stamp aria-hidden /> Approve denial</>}
               </button>
             </div>
             <p className={`hint ${ready ? 'met' : ''}`} style={{ margin: '-12px 0 0' }}>

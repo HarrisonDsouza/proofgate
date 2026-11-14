@@ -1,0 +1,60 @@
+# make test-conflict, Atlas, 2026-11-14 15:54 EST, commit d5b8032. Output unedited.
+{"ts": "2026-11-14T20:54:21.401688+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0005", "attempts": 2, "ms": 6220.5, "gate_decision_id": "GD-f7920050c8"}
+PASS (a) in-flight denial refused with G2 after suspension
+PASS (a) txn_attempts >= 2 (got 2)
+PASS (a) no denial written
+{"ts": "2026-11-14T20:54:31.982071+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "ALLOW", "proposal": "P-A-0006", "attempts": 1, "ms": 3862.3, "gate_decision_id": "GD-b71f9c0f9e"}
+{"ts": "2026-11-14T20:54:34.758818+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "ALLOW", "proposal": "P-A-0011", "attempts": 3, "ms": 6634.9, "gate_decision_id": "GD-a76324a048"}
+PASS (b) exactly one decision retried (attempts [1, 3])
+{"ts": "2026-11-14T20:55:59.246428+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0015", "attempts": 1, "ms": 2402.2, "gate_decision_id": "GD-da86ae6b5d"}
+{"ts": "2026-11-14T20:56:01.088059+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0017", "attempts": 1, "ms": 1689.2, "gate_decision_id": "GD-6e6db54f94"}
+{"ts": "2026-11-14T20:56:02.662437+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0018", "attempts": 1, "ms": 1423.7, "gate_decision_id": "GD-ddf8dbf6a6"}
+{"ts": "2026-11-14T20:56:04.235307+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0019", "attempts": 1, "ms": 1417.6, "gate_decision_id": "GD-3401882e97"}
+{"ts": "2026-11-14T20:56:05.824242+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0021", "attempts": 1, "ms": 1442.6, "gate_decision_id": "GD-080f1e924b"}
+{"ts": "2026-11-14T20:56:07.482408+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0023", "attempts": 1, "ms": 1563.2, "gate_decision_id": "GD-06581aa07a"}
+{"ts": "2026-11-14T20:56:09.154556+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0024", "attempts": 1, "ms": 1581.9, "gate_decision_id": "GD-1eebc7f1b5"}
+{"ts": "2026-11-14T20:56:11.152933+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0026", "attempts": 1, "ms": 1900.7, "gate_decision_id": "GD-b288bc83c5"}
+{"ts": "2026-11-14T20:56:12.829138+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0029", "attempts": 1, "ms": 1583.5, "gate_decision_id": "GD-367197dc00"}
+{"ts": "2026-11-14T20:56:15.115695+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0031", "attempts": 1, "ms": 2185.9, "gate_decision_id": "GD-f453932844"}
+{"ts": "2026-11-14T20:56:17.559929+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0033", "attempts": 1, "ms": 2342.9, "gate_decision_id": "GD-744fb8badf"}
+{"ts": "2026-11-14T20:56:19.199470+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0034", "attempts": 1, "ms": 1547.0, "gate_decision_id": "GD-9d945c8a12"}
+{"ts": "2026-11-14T20:56:21.210501+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0035", "attempts": 1, "ms": 1914.1, "gate_decision_id": "GD-a6cee83ffe"}
+{"ts": "2026-11-14T20:56:22.979053+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0037", "attempts": 1, "ms": 1670.6, "gate_decision_id": "GD-8e90f9491b"}
+{"ts": "2026-11-14T20:56:24.695524+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0039", "attempts": 1, "ms": 1608.4, "gate_decision_id": "GD-3056285e0b"}
+{"ts": "2026-11-14T20:56:26.683186+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0041", "attempts": 1, "ms": 1870.3, "gate_decision_id": "GD-822049eaa0"}
+{"ts": "2026-11-14T20:56:28.779022+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0042", "attempts": 1, "ms": 1674.0, "gate_decision_id": "GD-067b9e4480"}
+{"ts": "2026-11-14T20:56:30.543292+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0045", "attempts": 1, "ms": 1537.4, "gate_decision_id": "GD-de818ce826"}
+{"ts": "2026-11-14T20:56:32.653437+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0049", "attempts": 1, "ms": 2005.1, "gate_decision_id": "GD-34fc5db74e"}
+{"ts": "2026-11-14T20:56:34.331393+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0053", "attempts": 1, "ms": 1570.8, "gate_decision_id": "GD-8a40648061"}
+{"ts": "2026-11-14T20:56:36.022812+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0054", "attempts": 1, "ms": 1581.5, "gate_decision_id": "GD-25845161b1"}
+{"ts": "2026-11-14T20:56:38.079494+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0057", "attempts": 1, "ms": 1964.5, "gate_decision_id": "GD-a850d089dd"}
+{"ts": "2026-11-14T20:56:39.892903+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0065", "attempts": 1, "ms": 1714.9, "gate_decision_id": "GD-24d309225b"}
+{"ts": "2026-11-14T20:56:41.671252+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0067", "attempts": 1, "ms": 1668.3, "gate_decision_id": "GD-dcc030fc03"}
+{"ts": "2026-11-14T20:56:43.372467+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0069", "attempts": 1, "ms": 1603.0, "gate_decision_id": "GD-b7f6c78d9e"}
+{"ts": "2026-11-14T20:56:45.550535+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0073", "attempts": 1, "ms": 1761.6, "gate_decision_id": "GD-8a1535b09f"}
+{"ts": "2026-11-14T20:56:47.333060+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0077", "attempts": 1, "ms": 1680.5, "gate_decision_id": "GD-3ca41929f2"}
+{"ts": "2026-11-14T20:56:49.000217+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0079", "attempts": 1, "ms": 1567.9, "gate_decision_id": "GD-df4bdbcef9"}
+{"ts": "2026-11-14T20:56:51.011605+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0081", "attempts": 1, "ms": 1910.0, "gate_decision_id": "GD-9e8add8fee"}
+{"ts": "2026-11-14T20:56:53.304138+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0083", "attempts": 1, "ms": 2189.1, "gate_decision_id": "GD-fe52963294"}
+{"ts": "2026-11-14T20:56:54.958030+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0087", "attempts": 1, "ms": 1553.5, "gate_decision_id": "GD-b52b488b91"}
+{"ts": "2026-11-14T20:56:56.885982+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0088", "attempts": 1, "ms": 1836.3, "gate_decision_id": "GD-500209222c"}
+{"ts": "2026-11-14T20:56:58.535777+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0089", "attempts": 1, "ms": 1559.1, "gate_decision_id": "GD-d8db2c9381"}
+{"ts": "2026-11-14T20:57:01.289496+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0091", "attempts": 1, "ms": 2339.3, "gate_decision_id": "GD-a8f998f661"}
+{"ts": "2026-11-14T20:57:03.323879+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0093", "attempts": 1, "ms": 1943.0, "gate_decision_id": "GD-ceba7a0231"}
+{"ts": "2026-11-14T20:57:05.591054+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0094", "attempts": 1, "ms": 2111.0, "gate_decision_id": "GD-63bd9dcfd1"}
+{"ts": "2026-11-14T20:57:08.049119+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0095", "attempts": 1, "ms": 2351.7, "gate_decision_id": "GD-badd7a27c2"}
+{"ts": "2026-11-14T20:57:09.786156+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0097", "attempts": 1, "ms": 1581.3, "gate_decision_id": "GD-25613c86ee"}
+{"ts": "2026-11-14T20:57:11.452108+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0099", "attempts": 1, "ms": 1570.9, "gate_decision_id": "GD-28ab3b5591"}
+{"ts": "2026-11-14T20:57:13.129195+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0101", "attempts": 1, "ms": 1579.9, "gate_decision_id": "GD-0b6617203d"}
+{"ts": "2026-11-14T20:57:15.028465+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0107", "attempts": 1, "ms": 1780.9, "gate_decision_id": "GD-335ed6f267"}
+{"ts": "2026-11-14T20:57:16.796173+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0111", "attempts": 1, "ms": 1671.4, "gate_decision_id": "GD-2afb7a3530"}
+{"ts": "2026-11-14T20:57:18.581227+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0112", "attempts": 1, "ms": 1689.9, "gate_decision_id": "GD-17ad58a1a7"}
+{"ts": "2026-11-14T20:57:21.134683+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0113", "attempts": 1, "ms": 2438.1, "gate_decision_id": "GD-6faee5c5b1"}
+{"ts": "2026-11-14T20:57:23.300264+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0115", "attempts": 1, "ms": 2056.7, "gate_decision_id": "GD-c7d785286a"}
+{"ts": "2026-11-14T20:57:25.920489+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0116", "attempts": 1, "ms": 2509.0, "gate_decision_id": "GD-d1604be084"}
+{"ts": "2026-11-14T20:57:27.720780+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0119", "attempts": 1, "ms": 1707.8, "gate_decision_id": "GD-a045bfced9"}
+{"ts": "2026-11-14T20:57:29.807259+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0120", "attempts": 1, "ms": 1992.5, "gate_decision_id": "GD-d90e840d71"}
+{"ts": "2026-11-14T20:57:31.490578+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0123", "attempts": 1, "ms": 1591.1, "gate_decision_id": "GD-62b5aea520"}
+{"ts": "2026-11-14T20:57:33.146412+00:00", "level": "INFO", "logger": "proofgate", "msg": "gate", "decision": "REFUSE", "proposal": "P-A-0125", "attempts": 1, "ms": 1564.0, "gate_decision_id": "GD-1861220077"}
+PASS (c) forged burst executes 0 of 50
+PASS (c) client dwell_ms stored as ignored

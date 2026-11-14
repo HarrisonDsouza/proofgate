@@ -52,18 +52,18 @@ Synthetic cases; volunteers are not physicians; dwell is server-observed behavio
 were not reloaded from source files today.
 
 
-## 6. Checks that have been run (quote only after re-running on Atlas)
-Every row below was run on a LOCAL MongoDB 7 replica set in Docker ("local Docker, re-run on Atlas"). None of it has been
-run on the Atlas sandbox by this author. Team rule: never quote a number that did not come from your own command run on
+## 6. Checks that have been run
+Every row below was re-run on the team's Atlas sandbox cluster (M10) in the author's own database `proofgate_sukhman` on
+2026-11-14 (earlier runs were on a local Docker replica set). Team rule: never quote a number that did not come from your own command run on
 Atlas that day. Results of the simulator (`make eval`, `make eval-heldout`, `make calibrate-*`) are simulated and are
 deliberately NOT listed here; do not quote them.
 
 | Command | What it shows | Status |
 |---|---|---|
-| `make test-conflict` | (a) a denial in flight is refused with G2 after a suspension, retried; (b) of two concurrent decisions for one reviewer, exactly one retries; (c) a forged `dwell_ms` burst executes 0 | local Docker, re-run on Atlas |
-| `make bypass` | no grant and made-up grant both get 403; record unchanged | local Docker, re-run on Atlas |
-| `make rules` | R1-R8 | local Docker, re-run on Atlas |
-| `make test-restart` | detector killed mid-burst and restarted: one suspension from the change stream; second restart adds none; first start without a token catches up | local Docker, re-run on Atlas |
-| `pytest tests/test_gate_stress.py tests/test_review_integrity.py` | one approval cannot be spent twice; no ALLOW commits after a suspension; applied-but-unconfirmed denials are reopened; parallel heartbeats are credited once | local Docker, re-run on Atlas |
+| `make test-conflict` | (a) a denial in flight is refused with G2 after a suspension, retried; (b) of two concurrent decisions for one reviewer, exactly one retries; (c) a forged `dwell_ms` burst executes 0 | Atlas sandbox run, 2026-11-14 |
+| `make bypass` | no grant and made-up grant both get 403; record unchanged | Atlas sandbox run, 2026-11-14 |
+| `make rules` | R1-R8 | Atlas sandbox run, 2026-11-14 |
+| `make test-restart` | detector killed mid-burst and restarted: one suspension from the change stream; second restart adds none; first start without a token catches up | Atlas sandbox run, 2026-11-14 |
+| `pytest tests/test_gate_stress.py tests/test_review_integrity.py` | one approval cannot be spent twice; no ALLOW commits after a suspension; applied-but-unconfirmed denials are reopened; parallel heartbeats are credited once | Atlas sandbox run, 2026-11-14 |
 
-The Atlas run of the first four commands is the team's, from the PR review, and is the one to cite.
+Also passing on Atlas the same day: `make ci` (80 tests, about 3.5 minutes over the network) and `make e2e` (ALL PASS). The tech lead's own Atlas run from the PR review is the one to cite on stage; re-run before the demo.

@@ -33,30 +33,34 @@ def test_one_approval_cannot_be_spent_twice():
     assert db.grants.count_documents({"tenant_id": T, "approval_id": ap["approval_id"]}) == 1
 
 
-def test_no_allow_commits_after_a_suspension():
+def test_no_allow_commits_after_a_suspension(monkeypatch):
     from eval.test_conflict import seeded_honest_approval
     from pg import gate
     from pg.config import AGENT_ID, OPERATOR_ID
     from pg.db import get_db
     db = get_db()
+    import dataclasses
+    monkeypatch.setattr(gate, "settings", dataclasses.replace(gate.settings, debug_hooks=True))  # allow the pause hook
     _reset(db, "dr-late")
     fx = [seeded_honest_approval(db, "dr-late") for _ in range(8)]  # 8 < rate_max 10, so G6 does not interfere
     out = []
 
-    def run(p, ap):
-        out.append(gate.execute(T, p["proposal_id"], ap["approval_id"], AGENT_ID, OPERATOR_ID))
+    def run(p, ap, pause_ms=0):
+        # the first few commit at once; the rest pause after their reads, so the suspension lands while they are in
+        # flight and the version guard must make them retry and refuse (the race the test is about)
+        out.append(gate.execute(T, p["proposal_id"], ap["approval_id"], AGENT_ID, OPERATOR_ID, pause_ms))
 
     errors = []
 
-    def guarded(p, ap):
+    def guarded(p, ap, pause_ms=0):
         try:
-            run(p, ap)
+            run(p, ap, pause_ms)
         except Exception as e:  # a swallowed worker exception would make this test pass for the wrong reason
             errors.append(e)
 
-    ths = [threading.Thread(target=guarded, args=f) for f in fx]
+    ths = [threading.Thread(target=guarded, args=(*f, 0 if i < 3 else 4000)) for i, f in enumerate(fx)]
     def suspender():  # suspend only after at least one denial was authorised, so the test is not vacuous
-        end = time.time() + 5
+        end = time.time() + 12
         while time.time() < end and not any(o["decision"] == "ALLOW" for o in list(out)):
             time.sleep(0.001)
         gate.suspend(T, "dr-late", "supervisor", "STRESS", {})

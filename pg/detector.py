@@ -21,6 +21,7 @@ from pg import gate
 from pg import observability as obs
 from pg.cusum import Cusum, HonestModel, SelfCusum, SelfCusumState
 from pg.db import get_db, now
+from pg.stats import floor_cluster
 from pg.target import compensate
 
 STATE_ID = "rubber_stamp_detector"
@@ -148,18 +149,38 @@ def flag_attestation(db, ap: dict) -> None:
         obs.CLOSER_EVENTS.labels("voice_flag").inc()
 
 
+def flag_floor_clustering(db, tenant: str, reviewer_id: str, policy: dict) -> None:
+    """Record an examiner flag when approvals bunch just above the floor (pg.stats.floor_cluster). Never suspends.
+    One indexed read of the reviewer's last FLOOR_WINDOW approvals: constant work per event, independent of history."""
+    cfg = policy.get("detector", {}).get("floor_cluster", {})
+    if cfg.get("enabled", True) is False:
+        return
+    recent = [a["active_dwell_ms"] for a in db.approvals.find({"tenant_id": tenant, "reviewer_id": reviewer_id},
+                                                              {"active_dwell_ms": 1}).sort("created_at", -1).limit(FLOOR_WINDOW)]
+    r = floor_cluster(recent, policy["rules"]["min_active_dwell_ms"], cfg.get("delta", 0.25), cfg.get("p0", 0.25),
+                      cfg.get("alpha", 0.001), cfg.get("min_n", 8))
+    if r["flagged"]:
+        res = db.reviewer_flags.update_one({"tenant_id": tenant, "reviewer_id": reviewer_id, "kind": "FLOOR_CLUSTERING"},
+                                           {"$set": {"observed": r, "last_seen": now(), "policy_version": policy["version"]},
+                                            "$setOnInsert": {"first_seen": now()}}, upsert=True)
+        if res.upserted_id is not None:
+            obs.CLOSER_EVENTS.labels("flag_floor_clustering").inc()
+
+
 def handle(db, change: dict) -> str | None:
     ap = change["fullDocument"]
-    flag_attestation(db, ap)
     tenant, rid = ap["tenant_id"], ap["reviewer_id"]
+    flag_attestation(db, ap)
+    prop = db.proposals.find_one({"tenant_id": tenant, "proposal_id": ap["proposal_id"]}) or {}
+    action = prop.get("action_type", "claim_denial")
+    policy = gate.active_policy(db, tenant, action)
+    flag_floor_clustering(db, tenant, rid, policy)  # examiner flag only; recorded even for an already-suspended reviewer
     if db.suspensions.find_one({"tenant_id": tenant, "reviewer_id": rid, "active": True}):
         return None
-    prop = db.proposals.find_one({"tenant_id": tenant, "proposal_id": ap["proposal_id"]}) or {}
-    policy = gate.active_policy(db, tenant, prop.get("action_type", "claim_denial"))
     hit = check_streaming(db, tenant, rid, ap, policy)
     if hit:
         rule, observed = hit
-        gate.suspend(tenant, rid, "change_stream", rule, observed, prop.get("action_type", "claim_denial"))
+        gate.suspend(tenant, rid, "change_stream", rule, observed, action)
         obs.CLOSER_EVENTS.labels(f"suspend_{rule.lower()}").inc()
         return rule
     return None
@@ -212,6 +233,7 @@ def _cluster_time(db):
 
 
 MAX_EVENT_FAILURES = 5
+FLOOR_WINDOW = 30
 
 
 def run(stop: threading.Event | None = None) -> None:
@@ -234,15 +256,21 @@ def run(stop: threading.Event | None = None) -> None:
             obs.log_event("detector_start", resumed=False, catch_up_suspensions=n)
         try:
             with db.watch(PIPELINE, **kw) as cs:
+                last_idle_save = 0.0
                 while not (stop and stop.is_set()):
                     ch = cs.try_next()
                     if ch is None:
+                        # Idle: persist the stream's position (a token that precedes any undelivered event). Without
+                        # this a failing FIRST event has no token to replay from and would be skipped on restart.
+                        if cs.resume_token and time.time() - last_idle_save > 5:
+                            db.detector_state.update_one({"_id": STATE_ID}, {"$set": {"resume_token": cs.resume_token}}, upsert=True)
+                            last_idle_save = time.time()
                         time.sleep(0.05)
                         continue
                     try:
                         handle(db, ch)
                         failures = 0
-                    except (PyMongoError, LookupError) as e:
+                    except Exception as e:  # noqa: BLE001 - one bad event must never stop the detector
                         failures += 1
                         obs.log_event("detector_event_failed", error=type(e).__name__, attempt=failures)
                         if failures < MAX_EVENT_FAILURES:
@@ -265,9 +293,9 @@ def run(stop: threading.Event | None = None) -> None:
             else:
                 obs.log_event("detector_error", code=e.code)
                 time.sleep(1)
-        except (PyMongoError, LookupError) as e:
+        except Exception as e:  # noqa: BLE001 - never let the safety net die; back off, then resume from the saved token
             obs.log_event("detector_error", error=type(e).__name__)
-            time.sleep(1)  # back off, then resume from the saved token
+            time.sleep(1)
 
 
 def compensation_worker(stop: threading.Event | None = None, interval_s: float = 1.0) -> None:

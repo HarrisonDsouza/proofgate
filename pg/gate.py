@@ -9,6 +9,7 @@ again. EVERY operation inside the callback passes `session=s`.
 from __future__ import annotations
 
 import secrets
+import threading
 import time
 from datetime import timedelta
 
@@ -17,9 +18,10 @@ from pymongo.read_concern import ReadConcern
 from pymongo.write_concern import WriteConcern
 
 from pg import observability as obs
-from pg.checks import evaluate, rate_failed, window_start
+from pg.checks import evaluate, rate_failed
 from pg.config import settings
 from pg.db import client, get_db, now
+from pg.review import NotFound
 
 
 class VersionMoved(PyMongoError):
@@ -104,6 +106,59 @@ def suspend(tenant: str, reviewer_id: str, source: str, rule: str, observed: dic
                                   read_concern=ReadConcern("snapshot"), write_concern=WriteConcern("majority"))
 
 
+def load_gate_inputs(db, s, tenant: str, proposal_id: str, approval_id: str, t) -> dict:
+    """Everything the gate must read, in a single aggregation inside the transaction's snapshot.
+
+    Why: over the network each round trip costs ~85 ms; nine separate reads made every gate call ~1.5 s, so the
+    50-case burst took over a minute. The aggregation starts at the proposal and $lookups the approval, case, active
+    policy, reviewer, reviewer_state, active suspension, executor flag and the rate-window count. It returns exactly
+    what the nine reads returned (tests/test_gate_inputs.py compares them on every kind of case), the version guard
+    and every write below are unchanged, and it runs on the transaction's session, so it sees the same snapshot."""
+    def by_id(coll: str, key: str, expr) -> dict:
+        return {"$lookup": {"from": coll, "let": {"v": expr}, "as": coll_alias[coll],
+                            "pipeline": [{"$match": {"tenant_id": tenant, "$expr": {"$eq": ["$" + key, "$$v"]}}}, {"$limit": 1}]}}
+    coll_alias = {"cases": "case", "reviewers": "reviewer", "review_policies": "policy"}
+    pipeline = [
+        {"$match": {"tenant_id": tenant, "proposal_id": proposal_id}},
+        {"$limit": 1},
+        {"$lookup": {"from": "approvals", "as": "approval",
+                     "pipeline": [{"$match": {"tenant_id": tenant, "approval_id": approval_id}}, {"$limit": 1}]}},
+        {"$addFields": {"_rid": {"$ifNull": [{"$arrayElemAt": ["$approval.reviewer_id", 0]}, "unknown"]}}},
+        by_id("cases", "case_id", "$case_id"),
+        {"$lookup": {"from": "review_policies", "let": {"a": "$action_type"}, "as": "policy",
+                     "pipeline": [{"$match": {"tenant_id": tenant, "status": "active", "$expr": {"$eq": ["$action_type", "$$a"]}}},
+                                  {"$limit": 1}]}},
+        by_id("reviewers", "reviewer_id", "$_rid"),
+        {"$lookup": {"from": "reviewer_state", "let": {"r": "$_rid"}, "as": "rstate",
+                     "pipeline": [{"$match": {"$expr": {"$eq": ["$_id", {"$concat": [tenant, "|", "$$r"]}]}}}, {"$limit": 1}]}},
+        {"$lookup": {"from": "suspensions", "let": {"r": "$_rid"}, "as": "susp",
+                     "pipeline": [{"$match": {"tenant_id": tenant, "active": True, "$expr": {"$eq": ["$reviewer_id", "$$r"]}}},
+                                  {"$limit": 1}]}},
+        {"$lookup": {"from": "agent_control", "as": "ctl",
+                     "pipeline": [{"$match": {"_id": f"executor|{tenant}"}}, {"$limit": 1}]}},
+        {"$lookup": {"from": "approvals", "as": "winc",
+                     "let": {"r": "$_rid", "ms": {"$ifNull": [{"$arrayElemAt": ["$policy.rules.rate_window_ms", 0]}, 0]}},
+                     "pipeline": [{"$match": {"tenant_id": tenant, "$expr": {"$and": [
+                         {"$eq": ["$reviewer_id", "$$r"]},
+                         {"$gte": ["$created_at", {"$subtract": [t, "$$ms"]}]}, {"$lte": ["$created_at", t]}]}}},
+                         {"$count": "n"}]}},
+    ]
+    row = next(iter(db.proposals.aggregate(pipeline, session=s)), None)
+    if row is None:
+        raise NotFound("unknown proposal")
+    if not row["policy"]:
+        raise LookupError(f"no active policy for {tenant}/{row['action_type']}")
+    rid = row["_rid"]
+    rstate = row["rstate"][0] if row["rstate"] else {"_id": f"{tenant}|{rid}", "version": -1, "suspended": True}  # fail closed
+    prop = {k: v for k, v in row.items() if k not in ("approval", "case", "policy", "reviewer", "rstate", "susp", "ctl", "winc", "_rid")}
+    return {"prop": prop, "approval": row["approval"][0] if row["approval"] else None,
+            "case": row["case"][0] if row["case"] else None, "policy": row["policy"][0],
+            "reviewer": row["reviewer"][0] if row["reviewer"] else None, "rstate": rstate,
+            "susp": row["susp"][0] if row["susp"] else None,
+            "paused": bool((row["ctl"][0] if row["ctl"] else {}).get("paused")),
+            "window": row["winc"][0]["n"] if row["winc"] else 0}
+
+
 def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, operator_id: str, debug_pause_ms: int = 0) -> dict:
     db = get_db()
     attempts = {"n": 0}
@@ -111,29 +166,21 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
     def body(s):
         attempts["n"] += 1
         t = now()
-        prop = db.proposals.find_one({"tenant_id": tenant, "proposal_id": proposal_id}, session=s)
-        if not prop:
-            raise LookupError("unknown proposal")
-        approval = db.approvals.find_one({"tenant_id": tenant, "approval_id": approval_id}, session=s)
-        case = db.cases.find_one({"tenant_id": tenant, "case_id": prop["case_id"]}, session=s)
-        policy = active_policy(db, tenant, prop["action_type"], s)
+        ctx = load_gate_inputs(db, s, tenant, proposal_id, approval_id, t)  # ONE round trip, not nine
+        prop, approval, case, policy = ctx["prop"], ctx["approval"], ctx["case"], ctx["policy"]
+        reviewer, rstate, susp, paused, window = ctx["reviewer"], ctx["rstate"], ctx["susp"], ctx["paused"], ctx["window"]
         reviewer_id = (approval or {}).get("reviewer_id", "unknown")
-        reviewer = db.reviewers.find_one({"tenant_id": tenant, "reviewer_id": reviewer_id}, session=s)
         rs_id = f"{tenant}|{reviewer_id}"
-        rstate = db.reviewer_state.find_one({"_id": rs_id}, session=s)
-        if rstate is None:  # seeded for every reviewer; a missing one fails closed below
-            rstate = {"_id": rs_id, "version": -1, "suspended": True}
-        susp = db.suspensions.find_one({"tenant_id": tenant, "reviewer_id": reviewer_id, "active": True}, session=s)
-        paused = bool((db.agent_control.find_one({"_id": f"executor|{tenant}"}, session=s) or {}).get("paused"))
-        window = db.approvals.count_documents({"tenant_id": tenant, "reviewer_id": reviewer_id,
-                                               "created_at": {"$gte": window_start(t, policy), "$lte": t}}, session=s)
         allow, checks = evaluate(approval=approval, proposal=prop, case=case, policy=policy, reviewer=reviewer,
                                  reviewer_state=rstate, active_suspension=bool(susp), paused=paused,
                                  window_count=window, now=t, tenant_id=tenant)
         if debug_pause_ms and settings.debug_hooks and attempts["n"] == 1:
             time.sleep(debug_pause_ms / 1000)  # test-conflict hook: after reads, before the version write
-        # the version-guarded write every competing transaction also makes
-        if rstate["version"] >= 0:
+        # The version-guarded write that serialises the gate against a concurrent suspension or approval. It is needed
+        # only when this transaction would ALLOW: a refusal is always safe, whatever races with it (it fails closed),
+        # and every refusal that suspends the reviewer writes reviewer_state itself in suspend_in_txn. Skipping it for
+        # plain refusals saves a round trip and stops refusals from conflicting with each other.
+        if allow and rstate["version"] >= 0:
             r = db.reviewer_state.update_one({"_id": rs_id, "version": rstate["version"]},
                                              {"$inc": {"version": 1}, "$set": {"last_gate_at": t}}, session=s)
             if r.matched_count == 0:
@@ -185,8 +232,10 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
     obs.OPERATE_LATENCY.observe(tm["ms"] / 1000)
     if attempts["n"] > 1:
         obs.TXN_RETRIES.inc(attempts["n"] - 1)
-    obs.record_telemetry(db, "gate_latency_ms", tm["ms"], tenant_id=tenant, decision=out["decision"], attempts=attempts["n"],
-                         gate_decision_id=out["gate_decision_id"])
+    threading.Thread(target=obs.record_telemetry, daemon=True,  # off the critical path: a metric must not add a round trip
+                     args=(db, "gate_latency_ms", tm["ms"]),
+                     kwargs={"tenant_id": tenant, "decision": out["decision"], "attempts": attempts["n"],
+                             "gate_decision_id": out["gate_decision_id"]}).start()
     obs.log_event("gate", decision=out["decision"], proposal=proposal_id, attempts=attempts["n"], ms=round(tm["ms"], 1),
                   gate_decision_id=out["gate_decision_id"])
     return out
@@ -201,7 +250,10 @@ def confirm(tenant: str, denial_id: str) -> dict:
     db = get_db()
     d = db.denials.find_one({"tenant_id": tenant, "denial_id": denial_id})
     if d is None:
-        raise LookupError("unknown denial")
+        raise NotFound("unknown denial")
+    if d["status"] != "AUTHORIZED":  # idempotent: a confirmed, reversed or failed denial is never flipped by a repeat call
+        return {"denial_id": denial_id, "status": d["status"],
+                "readback": {"status": (d.get("readback") or {}).get("status"), "grant_id": d["grant_id"]}}
     pol = db.review_policies.find_one({"tenant_id": tenant, "policy_id": d["policy_id"], "version": d["policy_version"]})
     rec = db.target_records.find_one({"tenant_id": tenant, "kind": pol["effect"]["kind"], "record_id": d["record_id"]})
     ok = rec and rec.get("status") == pol["effect"]["apply_status"] and rec.get("last_apply", {}).get("grant_id") == d["grant_id"]

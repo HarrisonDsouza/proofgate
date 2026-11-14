@@ -11,14 +11,14 @@ import secrets
 import time
 from datetime import timedelta, timezone
 
-from pymongo import ReturnDocument, UpdateOne
+from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 
 from pg.checks import credit_heartbeat
 from pg.db import client, get_db, now
 
 
-class NotFound(Exception):
+class NotFound(LookupError):
     pass
 
 
@@ -39,22 +39,39 @@ def chain_body(ev: dict) -> str:
 
 def _event(db, tenant: str, session_id: str, reviewer_id: str, case_id: str, typ: str, credited_ms: int = 0,
            evidence_id: str | None = None, s=None, audio_sha256: str | None = None) -> None:
-    """Append a review_event, hash-chained per session (S3).
+    """Append one review_event to the session's hash chain (S3)."""
+    _events(db, tenant, session_id, reviewer_id, [{"case_id": case_id, "type": typ, "credited_ms": credited_ms,
+                                                  "evidence_id": evidence_id, "audio_sha256": audio_sha256}], s)
 
-    Atomic: the read of chain_head, the insert and the head update commit together, so two concurrent events on
-    one session conflict on the session document and one retries; the chain cannot fork (it did before this fix)."""
+
+def _events(db, tenant: str, session_id: str, reviewer_id: str, items: list[dict], s=None) -> None:
+    """Append N review_events to the session's hash chain in ONE read, ONE insert_many and ONE head update.
+
+    Atomic: the read of chain_head, the inserts and the head update commit together, so two concurrent writers on one
+    session conflict on the session document and one retries; the chain cannot fork. Seq numbers are reserved by
+    incrementing the session's counter by N, then the hashes are chained in order in memory."""
+    n = len(items)
+    if not n:
+        return
+
     def body(ss):
         sess = db.reviewer_sessions.find_one_and_update({"tenant_id": tenant, "session_id": session_id},
-                                                        {"$inc": {"seq": 1}}, return_document=True, session=ss)
+                                                        {"$inc": {"seq": n}}, return_document=True, session=ss)
         prev = sess.get("chain_head", "0" * 64)
-        t = now()
-        ev = {"tenant_id": tenant, "session_id": session_id, "seq": sess["seq"], "reviewer_id": reviewer_id,
-              "case_id": case_id, "evidence_id": evidence_id, "type": typ, "credited_ms": int(credited_ms), "audio_sha256": audio_sha256,
-              "ts": t.replace(microsecond=t.microsecond // 1000 * 1000)}  # BSON dates are ms: hash what is stored
-        ev["prev_hash"] = prev
-        ev["hash"] = hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest()
-        db.review_events.insert_one(ev, session=ss)
-        db.reviewer_sessions.update_one({"_id": sess["_id"]}, {"$set": {"chain_head": ev["hash"]}}, session=ss)
+        first = sess["seq"] - n + 1
+        evs = []
+        for i, it in enumerate(items):
+            t = now()
+            ev = {"tenant_id": tenant, "session_id": session_id, "seq": first + i, "reviewer_id": reviewer_id,
+                  "case_id": it["case_id"], "evidence_id": it.get("evidence_id"), "type": it["type"],
+                  "credited_ms": int(it.get("credited_ms", 0)), "audio_sha256": it.get("audio_sha256"),
+                  "ts": t.replace(microsecond=t.microsecond // 1000 * 1000)}  # BSON dates are ms: hash what is stored
+            ev["prev_hash"] = prev
+            ev["hash"] = hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest()
+            prev = ev["hash"]
+            evs.append(ev)
+        db.review_events.insert_many(evs, ordered=True, session=ss)
+        db.reviewer_sessions.update_one({"_id": sess["_id"]}, {"$set": {"chain_head": prev}}, session=ss)
 
     if s is not None:  # already inside the caller's transaction
         body(s)
@@ -143,14 +160,31 @@ def close_view(tenant: str, token: str) -> dict:
     return {"active_ms": (t or {}).get("active_ms", 0)}
 
 
-def _views_for(db, tenant: str, session_id: str, case_id: str) -> list[dict]:
+def _views_from_tokens(tokens) -> list[dict]:
     per: dict[str, dict] = {}
-    for t in db.view_tokens.find({"tenant_id": tenant, "session_id": session_id, "case_id": case_id}):
+    for t in tokens:
         end = t.get("closed_at") or t["last_hb_at"]
         v = per.setdefault(t["evidence_id"], {"evidence_id": t["evidence_id"], "hash": t["evidence_hash"], "active_ms": 0, "open_ms": 0})
         v["active_ms"] += int(t["active_ms"])
         v["open_ms"] += int((end - t["opened_at"]).total_seconds() * 1000)
     return list(per.values())
+
+
+def _views_for(db, tenant: str, session_id: str, case_id: str) -> list[dict]:
+    return _views_from_tokens(db.view_tokens.find({"tenant_id": tenant, "session_id": session_id, "case_id": case_id}))
+
+
+def _build_approval(tenant: str, sess: dict, prop: dict, rv: dict, pol: dict, views: list[dict], text: str,
+                    client_extra: dict | None, created_at) -> dict:
+    return {"tenant_id": tenant, "approval_id": _rid("AP"), "case_id": prop["case_id"], "proposal_id": prop["proposal_id"],
+            "reviewer_id": sess["reviewer_id"], "session_id": sess["session_id"],
+            "credential_snapshot": {k: rv[k] for k in ("license_no", "specialty", "license_expires_at")},
+            "views": views, "evidence_hashes_viewed": sorted({v["hash"] for v in views}),
+            "active_dwell_ms": int(sum(v["active_ms"] for v in views)), "policy_version_at_approval": int(pol["version"]),
+            "attestation_text": text if len(text or "") >= 10 else (text or "").ljust(10, "."),
+            "client_supplied_ignored": {k: v for k, v in (client_extra or {}).items()
+                                        if k not in ("proposal_id", "attestation_text", "attestation_id")},
+            "status": "submitted", "created_at": created_at}
 
 
 def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: str, client_extra: dict | None = None,
@@ -174,14 +208,7 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
         if not att:  # wrong case/session/tenant: one good recording cannot be reused across cases
             raise BadRequest("attestation does not belong to this session and case")
         attestation_text = att["transcript"]
-    ap = {"tenant_id": tenant, "approval_id": _rid("AP"), "case_id": prop["case_id"], "proposal_id": proposal_id,
-          "reviewer_id": sess["reviewer_id"], "session_id": session_id,
-          "credential_snapshot": {k: rv[k] for k in ("license_no", "specialty", "license_expires_at")},
-          "views": views, "evidence_hashes_viewed": sorted({v["hash"] for v in views}),
-          "active_dwell_ms": int(sum(v["active_ms"] for v in views)), "policy_version_at_approval": int(pol["version"]),
-          "attestation_text": attestation_text if len(attestation_text or "") >= 10 else (attestation_text or "").ljust(10, "."),
-          "client_supplied_ignored": {k: v for k, v in (client_extra or {}).items() if k not in ("proposal_id", "attestation_text", "attestation_id")},
-          "status": "submitted", "created_at": now()}
+    ap = _build_approval(tenant, sess, prop, rv, pol, views, attestation_text, client_extra, now())
     if att:
         ap["attestation_id"] = att["attestation_id"]
         ap["attestation_score"] = att["score"]["attestation_score"]
@@ -207,67 +234,48 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
 
 
 def approve_bulk(tenant: str, session_id: str, proposal_ids: list[str], attestation_text: str) -> dict:
-    """The deliberate 'Select all, approve 50': same records as approve() per id, one transaction. The gate decides what executes."""
+    """The deliberate 'Select all, approve 50' as ONE transaction.
+
+    Same approvals as calling approve() in a loop (tests/test_bulk_approve.py compares them field by field), but the
+    reads are batched and the writes are insert_many + bulk_write + one reviewer_state update + one chained event
+    batch, so the cost is about a dozen round trips whether the batch is 5 or 100 (a loop was ~15 round trips per
+    proposal: about a minute for 50 over the network). All-or-nothing: if any proposal moved on, nothing is stored."""
+    db = get_db()
     pids = list(dict.fromkeys(proposal_ids))  # de-duplicate, keep order
-    found = {p["proposal_id"] for p in get_db().proposals.find({"tenant_id": tenant, "proposal_id": {"$in": pids},
-                                                                  "status": {"$in": ["pending_review", "needs_review"]}},
-                                                                 {"proposal_id": 1})}
-    missing = [p for p in pids if p not in found]
+    sess = _session(db, tenant, session_id)
+    props = {p["proposal_id"]: p for p in db.proposals.find({"tenant_id": tenant, "proposal_id": {"$in": pids},
+                                                             "status": {"$in": ["pending_review", "needs_review"]}})}
+    missing = [p for p in pids if p not in props]
     if missing:  # validate everything first: a bad id must not leave half a batch approved
         raise BadRequest(f"{len(missing)} proposal id(s) unknown or not awaiting review, e.g. {missing[0]!r}; nothing was approved")
-    # Same records as calling approve() per id, written in ONE transaction instead of ~16 Atlas round trips per id
-    # (50 x 1.6 s on the sandbox). Every approval is still stored with its server-computed views; the gate judges each.
-    db = get_db()
-    sess = _session(db, tenant, session_id)
     rv = db.reviewers.find_one({"tenant_id": tenant, "reviewer_id": sess["reviewer_id"]})
-    _close_open_tokens(db, tenant, session_id)
-    props = {p["proposal_id"]: p for p in db.proposals.find({"tenant_id": tenant, "proposal_id": {"$in": pids}})}
     pols = {p["action_type"]: p for p in db.review_policies.find({"tenant_id": tenant, "status": "active",
-                                                                   "action_type": {"$in": list({p["action_type"] for p in props.values()})}})}
-    by_case: dict[str, dict[str, dict]] = {}
+                                                                  "action_type": {"$in": list({p["action_type"] for p in props.values()})}})}
+    _close_open_tokens(db, tenant, session_id)
+    by_case: dict[str, list] = {}
     for t in db.view_tokens.find({"tenant_id": tenant, "session_id": session_id,
-                                  "case_id": {"$in": [p["case_id"] for p in props.values()]}}):
-        end = t.get("closed_at") or t["last_hb_at"]
-        v = by_case.setdefault(t["case_id"], {}).setdefault(
-            t["evidence_id"], {"evidence_id": t["evidence_id"], "hash": t["evidence_hash"], "active_ms": 0, "open_ms": 0})
-        v["active_ms"] += int(t["active_ms"])
-        v["open_ms"] += int((end - t["opened_at"]).total_seconds() * 1000)
-    text = attestation_text if len(attestation_text or "") >= 10 else (attestation_text or "").ljust(10, ".")
+                                  "case_id": {"$in": list({p["case_id"] for p in props.values()})}}):
+        by_case.setdefault(t["case_id"], []).append(t)
+    base = now()
     aps = []
-    for pid in pids:
+    for i, pid in enumerate(pids):
         prop = props[pid]
-        views = list(by_case.get(prop["case_id"], {}).values())
-        aps.append({"tenant_id": tenant, "approval_id": _rid("AP"), "case_id": prop["case_id"], "proposal_id": pid,
-                    "reviewer_id": sess["reviewer_id"], "session_id": session_id,
-                    "credential_snapshot": {k: rv[k] for k in ("license_no", "specialty", "license_expires_at")},
-                    "views": views, "evidence_hashes_viewed": sorted({v["hash"] for v in views}),
-                    "active_dwell_ms": int(sum(v["active_ms"] for v in views)),
-                    "policy_version_at_approval": int(pols[prop["action_type"]]["version"]),
-                    "attestation_text": text, "client_supplied_ignored": {}, "status": "submitted", "created_at": now()})
+        t = base + timedelta(milliseconds=i)  # distinct, ordered timestamps, as a sequential loop would produce
+        aps.append(_build_approval(tenant, sess, prop, rv, pols[prop["action_type"]], _views_from_tokens(by_case.get(prop["case_id"], [])),
+                                   attestation_text, None, t))
+    rs_id = f"{tenant}|{sess['reviewer_id']}"
 
     def body(s):
-        db.approvals.insert_many([dict(a) for a in aps], session=s)
+        db.approvals.insert_many([dict(a) for a in aps], ordered=True, session=s)
+        # conditional per proposal, exactly as approve(): a concurrent gate call may have moved one on
         r = db.proposals.bulk_write([UpdateOne({"_id": props[a["proposal_id"]]["_id"], "status": {"$in": ["pending_review", "needs_review"]}},
-                                               {"$set": {"status": "approved", "approved_by": sess["reviewer_id"],
-                                                         "approval_id": a["approval_id"]}}) for a in aps], session=s)
-        if r.matched_count != len(aps):  # same guard as approve(): abort the whole batch, nothing half-approved
+                                               {"$set": {"status": "approved", "approved_by": sess["reviewer_id"], "approval_id": a["approval_id"]}})
+                                     for a in aps], ordered=True, session=s)
+        if r.matched_count != len(aps):
             raise BadRequest("a proposal is no longer awaiting review; nothing was approved")
-        db.reviewer_state.update_one({"_id": f"{tenant}|{sess['reviewer_id']}"},
-                                     {"$push": {"approval_ts": {"$each": [a["created_at"] for a in aps], "$slice": -100}},
-                                      "$inc": {"version": len(aps)}}, session=s)
-        # One hash-chained 'approve' event per approval, as approve() writes, appended under the same session lock.
-        head = db.reviewer_sessions.find_one_and_update({"tenant_id": tenant, "session_id": session_id},
-                                                        {"$inc": {"seq": len(aps)}}, return_document=ReturnDocument.AFTER, session=s)
-        prev, seq0, evs = head.get("chain_head", "0" * 64), head["seq"] - len(aps), []
-        for i, a in enumerate(aps, 1):
-            t = now()
-            ev = {"tenant_id": tenant, "session_id": session_id, "seq": seq0 + i, "reviewer_id": sess["reviewer_id"],
-                  "case_id": a["case_id"], "evidence_id": None, "type": "approve", "credited_ms": 0, "audio_sha256": None,
-                  "ts": t.replace(microsecond=t.microsecond // 1000 * 1000), "prev_hash": prev}
-            ev["hash"] = prev = hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest()
-            evs.append(ev)
-        db.review_events.insert_many(evs, session=s)
-        db.reviewer_sessions.update_one({"_id": head["_id"]}, {"$set": {"chain_head": prev}}, session=s)
+        db.reviewer_state.update_one({"_id": rs_id}, {"$push": {"approval_ts": {"$each": [a["created_at"] for a in aps], "$slice": -100}},
+                                                      "$inc": {"version": 1}}, session=s)
+        _events(db, tenant, session_id, sess["reviewer_id"], [{"case_id": a["case_id"], "type": "approve"} for a in aps], s)
 
     with client().start_session() as s:
         s.with_transaction(body)

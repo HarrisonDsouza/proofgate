@@ -11,6 +11,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 | #3 | Harry / `harry` | Tech-lead PR review replaces the API-key reviewer; work log; plan critique | tech lead | `make ci` PASS | OK | 13:03 |
 | #4 | Harry / `harry` | Research reports, FIXES.md must-fix list, doc corrections (docs only) | tech lead | `make ci` PASS | OK | 13:07 |
 | #5 | Harry / `harry` | Atlas-tier research, FIXES.md A1-A3, work-log time fixes (docs only) | tech lead | `make ci` PASS | OK | 13:08 |
+| #6 | Harry / `harry` | Security P1: console key on sessions and the control plane, refuse weak agent key, removed HTTP compensate and debug pause, paused run-once fix, bulk banner | tech lead | `make ci` 46 passed; live curl 401/401/405 | OK | 13:12 |
 
 ## Events
 

@@ -9,6 +9,7 @@ again. EVERY operation inside the callback passes `session=s`.
 from __future__ import annotations
 
 import secrets
+import threading
 import time
 from datetime import timedelta
 
@@ -175,8 +176,11 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
                                  window_count=window, now=t, tenant_id=tenant)
         if debug_pause_ms and settings.debug_hooks and attempts["n"] == 1:
             time.sleep(debug_pause_ms / 1000)  # test-conflict hook: after reads, before the version write
-        # the version-guarded write every competing transaction also makes
-        if rstate["version"] >= 0:
+        # The version-guarded write that serialises the gate against a concurrent suspension or approval. It is needed
+        # only when this transaction would ALLOW: a refusal is always safe, whatever races with it (it fails closed),
+        # and every refusal that suspends the reviewer writes reviewer_state itself in suspend_in_txn. Skipping it for
+        # plain refusals saves a round trip and stops refusals from conflicting with each other.
+        if allow and rstate["version"] >= 0:
             r = db.reviewer_state.update_one({"_id": rs_id, "version": rstate["version"]},
                                              {"$inc": {"version": 1}, "$set": {"last_gate_at": t}}, session=s)
             if r.matched_count == 0:
@@ -228,8 +232,10 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
     obs.OPERATE_LATENCY.observe(tm["ms"] / 1000)
     if attempts["n"] > 1:
         obs.TXN_RETRIES.inc(attempts["n"] - 1)
-    obs.record_telemetry(db, "gate_latency_ms", tm["ms"], tenant_id=tenant, decision=out["decision"], attempts=attempts["n"],
-                         gate_decision_id=out["gate_decision_id"])
+    threading.Thread(target=obs.record_telemetry, daemon=True,  # off the critical path: a metric must not add a round trip
+                     args=(db, "gate_latency_ms", tm["ms"]),
+                     kwargs={"tenant_id": tenant, "decision": out["decision"], "attempts": attempts["n"],
+                             "gate_decision_id": out["gate_decision_id"]}).start()
     obs.log_event("gate", decision=out["decision"], proposal=proposal_id, attempts=attempts["n"], ms=round(tm["ms"], 1),
                   gate_decision_id=out["gate_decision_id"])
     return out

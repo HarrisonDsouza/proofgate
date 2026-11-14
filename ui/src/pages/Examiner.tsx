@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ruleName, secs } from '../api'
+import { AgentTrace } from '../AgentTrace'
 import { Notice, Title } from '../ui'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -90,6 +91,7 @@ export default function Examiner() {
       {q.isError && <Notice tone="bad" head={`Could not load ${caseId}`} />}
       {d && !d.case && <Notice tone="bad" head={`No case ${caseId} in this tenant`} />}
       {d?.case && <Verdict d={d} />}
+      {d?.case && <AgentTrace caseId={d.case.case_id} />}
       {d?.case && (
         <ol className="entries">
           <Step n={1} title="Agent proposal" ok={!!d.proposal}>

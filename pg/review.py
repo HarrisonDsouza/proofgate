@@ -160,7 +160,7 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
     prop = db.proposals.find_one({"tenant_id": tenant, "proposal_id": proposal_id})
     if not prop:
         raise NotFound("unknown proposal")
-    if prop.get("status") not in ("pending_review", "needs_review", "approved"):
+    if prop.get("status") not in ("pending_review", "needs_review"):
         raise BadRequest(f"proposal is {prop.get('status')}; it cannot be approved again")
     rv = db.reviewers.find_one({"tenant_id": tenant, "reviewer_id": sess["reviewer_id"]})
     pol = db.review_policies.find_one({"tenant_id": tenant, "action_type": prop["action_type"], "status": "active"})
@@ -188,8 +188,13 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
 
     def body(s):
         db.approvals.insert_one(ap, session=s)
-        db.proposals.update_one({"_id": prop["_id"]}, {"$set": {"status": "approved", "approved_by": sess["reviewer_id"],
-                                                                "approval_id": ap["approval_id"]}}, session=s)
+        # Conditional: only a proposal still awaiting review can be approved. A concurrent gate call may have moved
+        # it to authorized/executed; resetting that to `approved` would allow a second grant for the same case.
+        r = db.proposals.update_one({"_id": prop["_id"], "status": {"$in": ["pending_review", "needs_review"]}},
+                                    {"$set": {"status": "approved", "approved_by": sess["reviewer_id"],
+                                              "approval_id": ap["approval_id"]}}, session=s)
+        if r.matched_count == 0:
+            raise BadRequest("proposal is no longer awaiting review")
         db.reviewer_state.update_one({"_id": rs_id}, {"$push": {"approval_ts": {"$each": [ap["created_at"]], "$slice": -100}},
                                                       "$inc": {"version": 1}}, session=s)
         _event(db, tenant, session_id, sess["reviewer_id"], prop["case_id"], "approve", 0, None, s)

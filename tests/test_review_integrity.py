@@ -121,3 +121,28 @@ def test_concurrent_detectors_do_not_lose_cusum_updates():
     st = db.reviewer_stats.find_one({"_id": f"{T}|dr-demo"})
     total = db.approvals.count_documents({"tenant_id": T, "reviewer_id": "dr-demo"})  # earlier tests may have approved too
     assert st["n"] == total, f"expected {total} counted, got {st['n']}"
+
+
+def test_approve_cannot_reset_a_proposal_that_moved_on_mid_transaction():
+    """The pre-check passes, then a gate call moves the proposal on before the approval commits: the conditional
+    update must abort the transaction, leave the proposal alone and store no approval."""
+    from pg import review
+    from pg.db import get_db
+    db = get_db()
+    sid = review.open_session(T, "dr-demo")["session_id"]
+    p = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
+    real = review._rid
+    n_before = db.approvals.count_documents({"tenant_id": T, "proposal_id": p["proposal_id"]})
+
+    def moved_on(prefix):  # runs after the pre-check, before the transaction body
+        db.proposals.update_one({"_id": p["_id"]}, {"$set": {"status": "authorized"}})
+        return real(prefix)
+
+    review._rid = moved_on
+    try:
+        with pytest.raises(review.BadRequest):
+            review.approve(T, sid, p["proposal_id"], "Reviewed this case in detail.")
+    finally:
+        review._rid = real
+    assert db.proposals.find_one({"_id": p["_id"]})["status"] == "authorized"
+    assert db.approvals.count_documents({"tenant_id": T, "proposal_id": p["proposal_id"]}) == n_before

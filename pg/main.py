@@ -5,22 +5,26 @@ Follows the PRD Section 8 contract. Run: uvicorn pg.main:app --port 8080
 from __future__ import annotations
 
 import json
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from pg import agent, gate, review, rules, target
+from pg import agent, config, gate, review, rules, target
 from pg.config import settings
 from pg.db import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    problems = config.key_problems(settings)
+    if problems:
+        raise RuntimeError("Refusing to start: " + "; ".join(problems))
     stops = []
     if settings.run_background:
         from pg import detector
@@ -38,9 +42,19 @@ def clean(x):
     return json.loads(json.dumps(x, default=str))
 
 
+def _same(given: str | None, expected: str) -> bool:
+    return bool(expected) and secrets.compare_digest((given or "").encode(), expected.encode())
+
+
 def agent_only(x_service_identity: str | None, x_service_key: str | None):
-    if x_service_identity != "triage-agent-v1" or x_service_key != settings.agent_service_key:
+    if x_service_identity != "triage-agent-v1" or not _same(x_service_key, settings.agent_service_key):
         raise HTTPException(401, "agent service identity required")
+
+
+def console_only(x_console_key: str | None = Header(None)):
+    """Operator console key for sessions and the control plane. Without it: 401, nothing is read or written."""
+    if not _same(x_console_key, settings.console_key):
+        raise HTTPException(401, "console key required")
 
 
 @app.exception_handler(review.NotFound)
@@ -49,7 +63,7 @@ async def nf(_, e):
 
 
 # ---------------- reviewer ----------------
-@app.post("/api/sessions")
+@app.post("/api/sessions", dependencies=[Depends(console_only)])
 def sessions(body: dict):
     return clean(review.open_session(body["tenant_id"], body["reviewer_id"]))
 
@@ -103,12 +117,12 @@ def approvals_bulk(body: dict, x_tenant_id: str = Header(...), x_session_id: str
 
 # ---------------- agent ----------------
 @app.post("/api/gate/execute")
-def gate_execute(body: dict, request: Request, x_tenant_id: str = Header(...), x_service_identity: str | None = Header(None),
+def gate_execute(body: dict, x_tenant_id: str = Header(...), x_service_identity: str | None = Header(None),
                  x_service_key: str | None = Header(None)):
     agent_only(x_service_identity, x_service_key)
-    pause = int(request.headers.get("X-Debug-Pause-Ms", "0") or 0)
+    # No debug-pause over HTTP: eval/test_conflict.py passes debug_pause_ms to gate.execute in Python.
     res = gate.execute(x_tenant_id, body["proposal_id"], body["approval_id"], body.get("agent_id", "triage-agent-v1"),
-                       body.get("operator_id", "op-ops-1"), pause)
+                       body.get("operator_id", "op-ops-1"))
     return JSONResponse(clean(res), status_code=200 if res["decision"] == "ALLOW" else 409)
 
 
@@ -119,7 +133,7 @@ def gate_confirm(body: dict, x_tenant_id: str = Header(...), x_service_identity:
     return gate.confirm(x_tenant_id, body["denial_id"])
 
 
-@app.post("/api/agent/run-once")
+@app.post("/api/agent/run-once", dependencies=[Depends(console_only)])
 def run_once(x_tenant_id: str = Header(...)):
     """Demo convenience: run the executor once over every approved deny proposal."""
     res = agent.executor_loop(x_tenant_id, once=True)
@@ -134,7 +148,7 @@ def run_once(x_tenant_id: str = Header(...)):
     return clean({"submitted": len(res), "executed": executed, "refused": len(res) - executed, "top_reasons": reasons})
 
 
-@app.post("/api/agent/pause")
+@app.post("/api/agent/pause", dependencies=[Depends(console_only)])
 def pause(body: dict, x_tenant_id: str = Header(...)):
     return gate.set_paused(x_tenant_id, bool(body.get("paused", True)))
 
@@ -145,13 +159,13 @@ def policies(x_tenant_id: str = Header(...)):
     return clean(list(get_db().review_policies.find({"tenant_id": x_tenant_id}, {"_id": 0}).sort("version", -1)))
 
 
-@app.post("/api/policies")
+@app.post("/api/policies", dependencies=[Depends(console_only)])
 def new_policy(body: dict, x_tenant_id: str = Header(...)):
     return gate.new_policy_version(x_tenant_id, body.get("action_type", "claim_denial"), body.get("rules", {}),
                                    body.get("rationale", "updated"), body.get("created_by", "supervisor"))
 
 
-@app.post("/api/suspensions")
+@app.post("/api/suspensions", dependencies=[Depends(console_only)])
 def halt(body: dict, x_tenant_id: str = Header(...)):
     return gate.suspend(x_tenant_id, body["reviewer_id"], "supervisor", body.get("reason", "SUPERVISOR_HALT"), {})
 

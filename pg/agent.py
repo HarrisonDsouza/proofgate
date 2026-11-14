@@ -47,6 +47,8 @@ def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool =
     results = []
     while not (stop and stop.is_set()):
         if (db.agent_control.find_one({"_id": f"executor|{tenant}"}) or {}).get("paused"):
+            if once:
+                return results  # paused: a one-shot run returns at once instead of waiting forever
             time.sleep(0.5)
             continue
         batch = list(db.proposals.find({"tenant_id": tenant, "status": "approved", "recommendation": "deny"}).limit(100))

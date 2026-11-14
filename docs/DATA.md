@@ -7,7 +7,7 @@
 | ICD-10-CM diagnosis codes, April 2025 (97,584 rows; 74,260 billable) | **Real**, public domain (CMS/CDC) | CMS order file via GitHub mirror `stabgan/ICD-10-CM-code-April-2025-CSV-FILE-ENHANCED` (cms.gov blocked on our network) | Diagnosis lines in every case |
 | HCPCS Level II codes (8,463) | **Real**, public domain (CMS) | GitHub mirror `Rahul-Soundararajan/hcpcs-data-pipeline` (`Main_List_HCPCS.csv`) | Billed-service lines |
 | Problem-size figures | **Real**, cited | KFF analyses of CMS data; ProPublica (`data/processed/problem_figures.json`, served at `/api/evidence/problem`) | Pitch and Evidence screen |
-| Honest review sessions | **Real**, collected today | Volunteers outside the team in tenant `payer-live` | Fit and certify the detector; independent row |
+| Honest review sessions | **Planned, not yet collected** | Volunteers outside the team in tenant `payer-live` (if the team runs them) | Would fit and certify the detector; until then the CUSUM threshold comes from a SYNTHETIC honest model and must be labelled so |
 | Cases, members, claims, policies, reviewers | Synthetic (seed 20261114) | `seed/generate.py` | Everything the gate acts on |
 | Gamer behaviours (stamper, idler, skimmer, forger, floor-gamer, drifter) | Synthetic models | `eval/simulate.py` | Evaluation |
 
@@ -38,7 +38,7 @@
 
 These are US figures; we are in Toronto. Say "US" plainly.
 
-## 4. Real honest sessions (the one behavioural dataset that is ours and not graded by us)
+## 4. Honest sessions (PLANNED: none have been collected yet)
 - 13:00–14:30, 5–10 people outside the team, 5 cases each, in tenant `payer-live` (seed it with
   `python -m seed.generate --tenant payer-live --cases 240 --seed 7 --reset --volunteers 10`; volunteers log in as `vol-1…vol-10`;
   the UI's tenant box set to `payer-live`).
@@ -52,18 +52,18 @@ Synthetic cases; volunteers are not physicians; dwell is server-observed behavio
 were not reloaded from source files today.
 
 
-## 6. Measured results (produced today by our own commands; never quote anything not in this section)
-Environment: a LOCAL MongoDB 7 replica set in Docker, not the Atlas sandbox. Re-run every command on Atlas before quoting. The evaluation is time-scaled and the non-honest behaviours are synthetic models.
+## 6. Checks that have been run (quote only after re-running on Atlas)
+Every row below was run on a LOCAL MongoDB 7 replica set in Docker ("local Docker, re-run on Atlas"). None of it has been
+run on the Atlas sandbox by this author. Team rule: never quote a number that did not come from your own command run on
+Atlas that day. Results of the simulator (`make eval`, `make eval-heldout`, `make calibrate-*`) are simulated and are
+deliberately NOT listed here; do not quote them.
 
-| Command | Result |
-|---|---|
-| `make test-conflict` | (a) in-flight denial refused with G2 after suspension, 2 attempts; (b) exactly one of two concurrent decisions retried; (c) forged 45 s `dwell_ms` burst executes 0 of 50 |
-| `make bypass` | no grant and made-up grant both 403, record unchanged |
-| `make rules` | R1-R8 all pass |
-| `make test-restart` | detector SIGKILLed mid-burst, restarted: one suspension, source `change_stream`; second kill/restart: still one; first start with no token: caught up (`detector_catchup`) |
-| `pytest tests/test_gate_stress.py` | 8 concurrent executes of one approval: exactly 1 ALLOW; suspension raced against 8 gate calls (6 runs): no ALLOW committed after it |
-| `make eval-heldout` (seed 20261114, CUSUM on) | stamper 0/200 executed, 4/4 suspended; tab-idler 0/32, 4/4; skimmer 0/32, 4/4; honest 95/96 executed, 0 suspended; drifter 4/4 suspended by CUSUM; fast-honest 20/32 executed, 1/4 suspended; heartbeat forger 16/16 executed and floor-gamer 32/32 executed (the documented null results) |
-| overall | false refusal 13/128 (10.2%, 95% CI 6.0-16.6%); false suspension 1/16 (6.2%, CI 1.1-28.3%): small n, say so |
-| `make calibrate-prd` | CUSUM threshold h=5.75 certified on the PRD's SYNTHETIC honest model (not volunteers): honest@75 s falsely suspended 5.0%, honest@35 s 5.75%, drifter caught 65.5%, floor-gamer-from-start caught 0% |
+| Command | What it shows | Status |
+|---|---|---|
+| `make test-conflict` | (a) a denial in flight is refused with G2 after a suspension, retried; (b) of two concurrent decisions for one reviewer, exactly one retries; (c) a forged `dwell_ms` burst executes 0 | local Docker, re-run on Atlas |
+| `make bypass` | no grant and made-up grant both get 403; record unchanged | local Docker, re-run on Atlas |
+| `make rules` | R1-R8 | local Docker, re-run on Atlas |
+| `make test-restart` | detector killed mid-burst and restarted: one suspension from the change stream; second restart adds none; first start without a token catches up | local Docker, re-run on Atlas |
+| `pytest tests/test_gate_stress.py tests/test_review_integrity.py` | one approval cannot be spent twice; no ALLOW commits after a suspension; applied-but-unconfirmed denials are reopened; parallel heartbeats are credited once | local Docker, re-run on Atlas |
 
-Honest reading: the calibration targets 5% false suspension and measured 5.0% and 5.75% on fresh draws, so say "about 5%", not "under 5%". Real volunteer sessions would replace the synthetic model (`make calibrate-detector`).
+The Atlas run of the first four commands is the team's, from the PR review, and is the one to cite.

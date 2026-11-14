@@ -51,7 +51,7 @@ All state lives in a cluster in the **MongoDB Atlas Hackathon Sandbox** project.
 
 - **Multi-document transactions** (snapshot read, majority write) for the gate, approvals, suspensions and policy versions, with a version-guarded write to `reviewer_state` so a concurrent approval and suspension conflict instead of both succeeding. `txn_attempts` is stored on every gate decision.
 - **Change streams with a saved resume token** for the rubber-stamp detector (rate, median dwell, self-baselined CUSUM). A restarted detector misses nothing (`make test-restart`).
-- **`$jsonSchema` validators** on every collection; the API ignores client-sent dwell.
+- **`$jsonSchema` validators** on every decision-bearing collection; the API ignores client-sent dwell.
 - **Partial unique indexes** (one open view per session, one active policy version), **TTL indexes** (view tokens, grants) and a **time-series collection** for gate telemetry.
 - Thresholds live in a versioned `review_policies` document, never in code; the Supervisor page can only tighten them.
 
@@ -179,7 +179,7 @@ drifter       4    64    64       0     0  {} {}
 - **Timestamps:** `PREREGISTRATION.md` says "Committed at: 14:58 EST"; that line is a typo. Git shows the pre-registration commit `7df270e` at **14:25** and the held-out results commit `350d06c` at **14:31**.
 - The held-out run used commit `7df270e`; the baseline used `7597a52` (after the gate hardening PR merged). An earlier baseline attempt was discarded because its detector thread crashed when tests ran on the cluster at the same time.
 - After both runs, "approve 50" was changed to write its 50 approval records in one transaction (it took ~5 minutes on the sandbox before). The gate logic and what it checks did not change.
-- Not built today: Vector Search / Voyage AI, an LLM-written rationale, the account-freeze action, a read-only MCP server. LangSmith tracing is wired to the agent steps but only records when `LANGSMITH_TRACING=true`.
+- Not built today: Vector Search / Voyage AI, an LLM-written rationale, the account-freeze action, a read-only MCP server. LangSmith tracing is wired to the agent's triage step (not the executor, whose output carries the grant token) and only records when `LANGSMITH_TRACING=true`.
 - Synthetic cases built on real public-domain ICD-10-CM and HCPCS codes. Not a medical or claims tool.
 
 ## Rules everyone follows

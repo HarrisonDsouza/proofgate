@@ -91,7 +91,7 @@
 ## Partner tools (new)
 
 **"How do you use LangSmith?"**
-> Only if `LANGSMITH_TRACING=true` was set for the demo: each executor step (gate → claims system → confirm) is wrapped in a LangSmith trace for debugging. Atlas remains the record of authority; the examiner and rules read Atlas, not traces. If tracing wasn't on, say: "the hook is wired, we didn't run it today."
+> Only if `LANGSMITH_TRACING=true` was set for the demo: the agent's triage step is traced in LangSmith for debugging. The executor step is deliberately not traced, because its result carries the single-use grant token. Atlas remains the record of authority; the examiner and rules read Atlas, not traces. If tracing wasn't on, say: "the hook is wired, we didn't run it today."
 
 **"How do you use ElevenLabs?"** (if spoken attestation shipped)
 > The reviewer can speak their attestation. ElevenLabs speech-to-text transcribes it on our server, and the transcript plus an audio hash are stored with the approval in Atlas. A spoken, case-specific statement is far harder to bulk-stamp than a checkbox. It's evidence only and never decides anything.

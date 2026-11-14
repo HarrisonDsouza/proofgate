@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Stamp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, ruleName, secs, store, TENANT, type Policy, type QueueItem, type RunOnce, type Session } from '../api'
+import { api, ApiError, refusalReason, secs, store, TENANT, type Policy, type QueueItem, type RunOnce, type Session } from '../api'
 import { useHeartbeat } from '../useHeartbeat'
 import { Notice, Title, type Tone } from '../ui'
 
@@ -13,7 +13,7 @@ type Result = { tone: Tone; head: string; lines: string[]; caseId?: string; deni
 function reasons(r: Record<string, number>) {
   return Object.entries(r)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${ruleName(k)}: refused ${v}`)
+    .map(([k, v]) => `Refused ${v}: ${refusalReason(k)}`)
 }
 
 export function errText(e: unknown) {

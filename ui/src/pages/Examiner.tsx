@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, ruleName, secs } from '../api'
+import { api, refusalReason, ruleName, secs } from '../api'
 import { AgentTrace } from '../AgentTrace'
 import { Notice, Title } from '../ui'
 
@@ -49,8 +49,8 @@ function Verdict({ d }: { d: Ex }) {
   return (
     <Notice
       tone="bad"
-      head={`${d.case.case_id} refused: ${failed.length ? ruleName(failed[0].rule) : 'see checks'}`}
-      lines={failed.length > 1 ? [`Also failed: ${failed.slice(1).map((c: any) => ruleName(c.rule)).join(' · ')}`] : ['No grant was minted; the claims system was never changed.']}
+      head={`${d.case.case_id} refused: ${failed.length ? refusalReason(failed[0].rule) : 'see checks'}`}
+      lines={failed.length > 1 ? [`Also: ${failed.slice(1).map((c: any) => refusalReason(c.rule)).join(' · ')}`] : ['No grant was minted; the claims system was never changed.']}
       stamp={{ text: 'REFUSED', sub: 'NO GRANT ISSUED', ink: 'red' }}
     />
   )

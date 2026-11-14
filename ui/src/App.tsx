@@ -29,9 +29,9 @@ function Ledger() {
   if (!data) return <div className="ledger muted">connecting to Atlas…</div>
   return (
     <div className="ledger" aria-live="polite">
-      <span><b className="num">{data.executed}</b> executed</span>
-      <span><b className="num">{data.refused}</b> refused by the gate</span>
-      <span><b className="num">{data.reversed}</b> reopened</span>
+      <span><b className="num good">{data.executed}</b> executed</span>
+      <span><b className={`num ${data.refused ? 'bad' : ''}`}>{data.refused}</b> refused by the gate</span>
+      <span><b className={`num ${data.reversed ? 'bad' : ''}`}>{data.reversed}</b> reopened</span>
       <span><b className="num">{data.pending}</b> awaiting review</span>
       {data.suspended_reviewers.length > 0 && (
         <span className="tag bad">suspended: {data.suspended_reviewers.join(', ')}</span>

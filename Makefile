@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
+.PHONY: ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
 
 install:      ; pip install -r requirements-dev.txt
 smoke:        ; python -m pg.db --smoke
@@ -23,3 +23,7 @@ eval:         ; python -m eval.simulate --seed 1
 eval-heldout: ; python -m eval.simulate --seed 20261114
 baseline:     ; python -m eval.simulate --seed 20261114 --baseline
 deploy:       ; gcloud run deploy proofgate --source . --region us-central1 --allow-unauthenticated --min-instances 1
+
+# Same checks as .github/workflows/ci.yml, runnable locally (use before every PR while GitHub Actions is unavailable)
+secret-scan:  ; ! git grep -nE "(sk-ant-|sk-[A-Za-z0-9]{20,}|mongodb\+srv://[^<\"]+:[^<\"]+@)" -- . ':!*.md' ':!.env.example' ':!.github/workflows/ci.yml' ':!Makefile' && echo "secret-scan: PASS"
+ci: lint test secret-scan

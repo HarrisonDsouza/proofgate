@@ -1,11 +1,31 @@
-An AI agent can propose denying an insurance claim. ProofGate makes sure that denial cannot run without proof that a qualified human really reviewed that case. Everything you see uses synthetic data.
+Imagine an AI agent recommends denying someone's insurance claim. Before that denial goes through, how can we be sure a human actually reviewed the evidence, instead of just clicking approve?
 
-Here, a reviewer clicks approve on a whole batch at once. The gate transaction in MongoDB Atlas checks the proof, and the forged burst executes 0 of 50. The reviewer is suspended mid-run.
+That's the problem we're solving with ProofGate.
 
-Now an honest review. The reviewer opens every piece of evidence the agent cited, and the server, not the browser, times it. The gate issues a single-use grant, the denial executes, and we read the claims system back to prove it.
+Everything in this demo uses synthetic data.
 
-Try to bypass the gate and call the claims system directly. There is no grant, so the bypass gets 403.
+First, let's see what happens when someone tries to approve 50 claims all at once, without properly reviewing them.
 
-An examiner can rebuild any case: what the agent cited, what the reviewer opened, every rule that was checked, and the grant. Rules R1 to R8 pass.
+ProofGate uses MongoDB Atlas to check whether each claim has valid proof of human review. It detects the suspicious activity, blocks all 50 denials, and suspends the reviewer.
+
+Now, let's look at a legitimate review.
+
+The reviewer opens every piece of evidence the AI used to recommend the denial. And instead of trusting what the browser reports, our server tracks the time spent reviewing that evidence.
+
+Once the required checks pass, ProofGate issues a one-time authorization. Only then can the denial go through.
+
+We also check the claims system directly to confirm what actually happened.
+
+But what if someone tries to bypass ProofGate and send a denial straight to the claims system?
+
+It doesn't work. Without that authorization, the system rejects the request.
+
+And here's what makes ProofGate auditable.
+
+An independent examiner can reconstruct the entire decision. They can see what evidence the AI cited, what the human reviewed, which rules were checked, and whether the denial was properly authorized.
+
+We also verify that all eight of our security and review rules pass.
+
+So instead of simply trusting that a human was involved, ProofGate requires evidence that the review actually happened.
 
 ProofGate. No proof of review, no denial.

@@ -1,0 +1,31 @@
+Imagine an AI agent recommends denying someone's insurance claim. Before that denial goes through, how can we be sure a human actually reviewed the evidence, instead of just clicking approve?
+
+That's the problem we're solving with ProofGate.
+
+Everything in this demo uses synthetic data.
+
+First, let's see what happens when someone tries to approve 50 claims all at once, without properly reviewing them.
+
+ProofGate uses MongoDB Atlas to check whether each claim has valid proof of human review. It detects the suspicious activity, blocks all 50 denials, and suspends the reviewer.
+
+Now, let's look at a legitimate review.
+
+The reviewer opens every piece of evidence the AI used to recommend the denial. And instead of trusting what the browser reports, our server tracks the time spent reviewing that evidence.
+
+Once the required checks pass, ProofGate issues a one-time authorization. Only then can the denial go through.
+
+We also check the claims system directly to confirm what actually happened.
+
+But what if someone tries to bypass ProofGate and send a denial straight to the claims system?
+
+It doesn't work. Without that authorization, the system rejects the request.
+
+And here's what makes ProofGate auditable.
+
+An independent examiner can reconstruct the entire decision. They can see what evidence the AI cited, what the human reviewed, which rules were checked, and whether the denial was properly authorized.
+
+We also verify that all eight of our security and review rules pass.
+
+So instead of simply trusting that a human was involved, ProofGate requires evidence that the review actually happened.
+
+ProofGate. No proof of review, no denial.

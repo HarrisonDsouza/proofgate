@@ -93,9 +93,11 @@ export default function Review() {
     const n = submitted ?? r.submitted
     const dash = await api<{ suspended_reviewers: string[] }>('/api/dashboard')
     const suspended = dash.suspended_reviewers.includes(session?.reviewer_id ?? '')
-    const lines = [`Executed ${r.executed} of ${n}. Refused ${n - r.executed}.`, ...reasons(r.top_reasons)]
-    if (suspended) lines.push(`${session?.reviewer_id} is SUSPENDED: grants revoked, pending approvals sent back to review.`)
-    setResult({ tone: r.executed > 0 && !suspended ? 'good' : 'bad', title, lines })
+    const head = `Executed ${r.executed} of ${n}` + (suspended ? ` · ${session?.reviewer_id} SUSPENDED` : '')
+    const lines = [`${title}: refused ${n - r.executed}.`, ...reasons(r.top_reasons)]
+    if (suspended) lines.push('Grants revoked, pending approvals sent back to review, executed denials queued to reopen.')
+    if (r.executed > 0 && !suspended) lines.push('Denial executed and read back from the claims system.')
+    setResult({ tone: r.executed > 0 && !suspended ? 'good' : 'bad', title: head, lines })
     qc.invalidateQueries()
   }
 
@@ -154,7 +156,7 @@ export default function Review() {
       </section>
 
       {result && (
-        <section className={`result ${result.tone}`} role="status">
+        <section className={`result ${result.tone}`} role={result.tone === 'bad' ? 'alert' : 'status'}>
           <strong>{result.title}</strong>
           {result.lines.map((l) => (
             <div key={l}>{l}</div>

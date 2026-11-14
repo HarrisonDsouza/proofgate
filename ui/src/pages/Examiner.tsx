@@ -11,12 +11,39 @@ const when = (t?: string) => (t ? new Date(t).toLocaleTimeString() : '—')
 function Step({ n, title, ok, children }: { n: number; title: string; ok?: boolean | null; children: React.ReactNode }) {
   return (
     <li className="step">
-      <div className={`dot ${ok === true ? 'good' : ok === false ? 'bad' : ''}`}>{n}</div>
+      <div className={`dot ${ok === true ? 'good' : ok === false ? 'bad' : ''}`} aria-label={`Step ${n}${ok === true ? ', passed' : ok === false ? ', failed' : ''}`}>
+        {ok === true ? '✓' : ok === false ? '✗' : n}
+      </div>
       <div className="body">
         <h3>{title}</h3>
         {children}
       </div>
     </li>
+  )
+}
+
+function Verdict({ d }: { d: Ex }) {
+  const g = d.gate_decisions?.at(-1)
+  if (!g) return <div className="result info verdict"><strong>{d.case.case_id}: no gate decision yet</strong></div>
+  const failed = (g.checks ?? []).filter((c: any) => !c.pass)
+  const nChecks = (g.checks ?? []).length
+  if (g.decision === 'ALLOW') {
+    const reopened = d.compensation?.status === 'confirmed'
+    return (
+      <div className={`result ${reopened ? 'bad' : 'good'} verdict`}>
+        <strong>
+          {reopened ? 'ALLOWED, then REOPENED' : 'ALLOWED'} · server dwell {secs(d.approval?.active_dwell_ms)} · {nChecks - failed.length}/{nChecks} checks
+          {d.denial ? ` · denial ${d.denial.status}` : ''}
+          {d.denial?.readback ? `, read back ${d.denial.readback.status}` : ''}
+        </strong>
+      </div>
+    )
+  }
+  return (
+    <div className="result bad verdict">
+      <strong>REFUSED · {failed.length ? ruleName(failed[0].rule) : 'see checks'}</strong>
+      {failed.length > 1 && <div>Also failed: {failed.slice(1).map((c: any) => ruleName(c.rule)).join(' · ')}</div>}
+    </div>
   )
 }
 
@@ -52,6 +79,7 @@ export default function Examiner() {
       {q.isLoading && <p className="muted">Reading {caseId} from Atlas…</p>}
       {q.isError && <p className="result bad">Could not load {caseId}.</p>}
       {d && !d.case && <p className="result bad">No case {caseId} in this tenant.</p>}
+      {d?.case && <Verdict d={d} />}
       {d?.case && (
         <ol className="timeline">
           <Step n={1} title="Agent proposal" ok={!!d.proposal}>
@@ -113,7 +141,7 @@ export default function Examiner() {
                   status <span className="tag">{d.approval.status}</span> · {when(d.approval.created_at)}
                 </p>
                 {d.approval.attestation_text && <blockquote>{d.approval.attestation_text}</blockquote>}
-                {d.approval.client_supplied_ignored && Object.keys(d.approval.client_supplied_ignored).length > 0 && (
+                {d.approval.client_supplied_ignored && Object.values(d.approval.client_supplied_ignored).some((v) => v != null) && (
                   <p className="muted">
                     The browser also sent: <code>{JSON.stringify(d.approval.client_supplied_ignored).slice(0, 120)}</code> — stored and ignored.
                   </p>
@@ -183,7 +211,7 @@ export default function Examiner() {
             )}
           </Step>
 
-          <Step n={6} title="Suspension and reopen" ok={d.compensation ? d.compensation.status === 'confirmed' : null}>
+          <Step n={6} title="Suspension and reopen" ok={d.suspension ? (d.compensation ? d.compensation.status === 'confirmed' : false) : d.approval ? true : null}>
             {d.suspension ? (
               <p>
                 <span className="mono">{d.suspension.reviewer_id}</span> suspended by <b>{d.suspension.source}</b> · rule{' '}

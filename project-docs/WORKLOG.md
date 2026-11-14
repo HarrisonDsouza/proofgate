@@ -60,6 +60,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - 15:15 Bulk speed-up (Harry approved): approve_bulk writes the 50 approvals, proposal updates, reviewer_state and hash-chained events in one transaction; the executor re-reads status and skips proposals a suspension already sent back. Scratch tenant: 50 approvals 2.1 s (was ~80 s), agent run 5.9 s. Browser: bulk 4.3 s + run-once 16.1 s, "Executed 0 of 50 · suspended". `make test` 80 passed, lint clean.
 - 15:20 Status audit (PRD, first handoff, combined plan vs code). README Results + disclosures filled from docs/eval-*.txt; baseline committed; enforcement map refreshed; judge Q&A placeholders filled and a do-not-claim list added; LangSmith hook applied to agent steps.
 - 15:27 PR #12 merged to main (17a6ab2). Open for teammates: Sukhman's DATA.md commit on `sukhman` is not merged; Neil has no commits.
+- 15:37 Persona (4 non-technical domain experts) and judge-archetype (4) review workflow; findings and prioritized actions in project-docs/research/persona-and-judge-review.md. Fix from it: executor no longer LangSmith-traced (grant token). PR #13 opened, awaiting Harry's merge.
 
 ## Checkpoints
 

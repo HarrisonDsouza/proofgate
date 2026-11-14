@@ -1,0 +1,32 @@
+# make baseline (policy v0: approval existence only; same seed 20261114 and workload), Atlas, 2026-11-14 14:57 EST. Output pasted unedited (per-gate JSON log lines omitted).
+# Note: run on commit 7597a52 (after PR #8 merged); the held-out run used 7df270e (before). An earlier baseline attempt was discarded because its detector thread crashed on a scratch tenant created by tests run at the same time.
+python -m eval.simulate --seed 20261114 --baseline
+commit 7597a52 seed 20261114 baseline=True cusum=True
+group         n   att  exec refused  susp  reasons
+honest       12    96    96       0     0  {} {}
+fast-honest   4    32    32       0     0  {} {}
+stamper       4   200   164      36     4  {'G1_APPROVAL_FOR_CASE': 36} {'MEDIAN_DWELL': 4}
+tab-idler     4    32    31       1     4  {'G1_APPROVAL_FOR_CASE': 1} {'MEDIAN_DWELL': 4}
+skimmer       4    32    32       0     4  {} {'MEDIAN_DWELL': 4}
+hb-forger     2    16    16       0     0  {} {}
+floor-gamer   4    32    32       0     0  {} {}
+drifter       4    64    64       0     0  {} {}
+{
+ "false_refusal": "0/128 (0.0%, 95% CI 0.0-2.9%)",
+ "false_suspension": "0/16 (0.0%, 95% CI 0.0-19.4%)",
+ "median_verified_active_s_per_executed": 53.43,
+ "txn_attempts": {
+  "1": 503,
+  "7": 1
+ },
+ "rules": {
+  "R1": true,
+  "R2": false,
+  "R3": true,
+  "R4": true,
+  "R5": false,
+  "R6": true,
+  "R7": true,
+  "R8": true
+ }
+}

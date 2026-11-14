@@ -58,7 +58,7 @@
 ## Security and trust (likely from Okta, Microsoft, Cohere, Zafin)
 
 **"I'll curl a fake `dwell_ms: 45000`."**
-> It's ignored: stored under `client_supplied_ignored` and never used. The gate compares server-computed dwell to the floor, at file:line [from `docs/enforcement-map.md`]. *(Demo: `make burst-forged` → 0.)*
+> It's ignored: stored under `client_supplied_ignored` and never used. The gate compares server-computed dwell to the floor, at file:line [from `docs/enforcement-map.md`]. *(Proof: `make test-conflict` — a forged burst of 50 executes 0.)*
 
 **"What stops your own service fabricating review records?"**
 > If S3 ships: review events are hash-chained per session, and the examiner recomputes the chain and dwell from raw heartbeats. Honest limit: a fully compromised writer could rebuild a whole chain; that needs external anchoring, which we haven't built.
@@ -69,10 +69,10 @@
 ## Evaluation and honesty (likely from the Vector Institute and Acerta judges)
 
 **"How many honest reviewers did you wrongly suspend?"**
-> [read from make eval: honest X/12, fast-honest Y/4]. Thresholds were pre-registered at commit [hash] before the held-out run, and fast reviewers are a separate group precisely to measure that harm.
+> None in the held-out run: false suspension 0/16 (honest 0/12, fast-honest 0/4; 95% CI 0–19.4%). The cost shows up as refusals instead: 5 of 128 honest approvals (3.9%, CI 1.7–8.8%) were refused for dwell below the floor, and the reviewer can re-review. Thresholds were pre-registered at commit 7df270e (14:25) before the held-out run (results commit 350d06c, 14:31), and fast reviewers are a separate group precisely to measure that harm. Source: `docs/eval-heldout.txt`.
 
 **"Show me where it fails."**
-> The heartbeat-forger group passes [read from make eval]. Server timing raises the cost of faking review from one click to sustained scripted work per item, but it cannot prove reading. We say that up front.
+> The heartbeat-forger group passes (16 of 16 executed), and so does the floor-gamer group (32 of 32, held only to the floor). Both were predicted in the pre-registration. Server timing raises the cost of faking review from one click to sustained scripted work per item, but it cannot prove reading. We say that up front.
 
 **"Is the eval real?"**
 > It's simulated and time-scaled ÷10 against our real endpoints, with synthetic data. It's not a study of real reviewers.
@@ -91,7 +91,7 @@
 ## Partner tools (new)
 
 **"How do you use LangSmith?"**
-> It traces each agent step (triage → gate → claims system → confirm) for debugging, tagged by case id. Atlas remains the record of authority; the examiner and rules read Atlas, not traces.
+> Only if `LANGSMITH_TRACING=true` was set for the demo: each executor step (gate → claims system → confirm) is wrapped in a LangSmith trace for debugging. Atlas remains the record of authority; the examiner and rules read Atlas, not traces. If tracing wasn't on, say: "the hook is wired, we didn't run it today."
 
 **"How do you use ElevenLabs?"** (if spoken attestation shipped)
 > The reviewer can speak their attestation. ElevenLabs speech-to-text transcribes it on our server, and the transcript plus an audio hash are stored with the approval in Atlas. A spoken, case-specific statement is far harder to bulk-stamp than a checkbox. It's evidence only and never decides anything.
@@ -99,3 +99,7 @@
 
 **"Why not let an LLM decide?"**
 > Policy that lives in a prompt isn't enforcement: agents have ignored stop instructions in reported incidents [VERIFY]. Every decision here is deterministic code reading a versioned policy in Atlas.
+
+## Do not claim (not built today)
+
+Vector Search / Voyage AI, a read-only MongoDB MCP server, the account-freeze action, an LLM-written rationale, LangGraph. G6 (rate) fires in the live UI demo but did not fire in the time-scaled held-out eval; stampers there were refused by G4/G5/G2 and suspended by the detector's median rule.

@@ -14,8 +14,10 @@ from fastapi import HTTPException
 from pg import gate, target
 from pg.config import AGENT_ID, OPERATOR_ID
 from pg.db import get_db
+from pg.observability import traceable
 
 
+@traceable("agent.triage")
 def triage(case: dict, clauses: list[dict]) -> dict:
     """Deterministic rule: deny when the prior-auth evidence says 'none on file' and the policy needs one."""
     ev = {e["evidence_id"]: e for e in case["evidence"]}
@@ -30,6 +32,7 @@ def triage(case: dict, clauses: list[dict]) -> dict:
             "cited_clauses": [clause] if clause else []}
 
 
+@traceable("executor.execute_one")  # LangSmith trace when LANGSMITH_TRACING=true; no-op otherwise
 def execute_one(tenant: str, proposal: dict) -> dict:
     res = gate.execute(tenant, proposal["proposal_id"], proposal["approval_id"], AGENT_ID, OPERATOR_ID)
     if res["decision"] != "ALLOW":
@@ -53,6 +56,10 @@ def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool =
             continue
         batch = list(db.proposals.find({"tenant_id": tenant, "status": "approved", "recommendation": "deny"}).limit(100))
         for p in batch:
+            # Re-read before acting: a suspension mid-batch sends the rest back to review, and asking the gate about
+            # each of those costs a full transaction (~1.9 s on the sandbox) for a certain refusal.
+            if not db.proposals.find_one({"_id": p["_id"], "status": "approved"}, {"_id": 1}):
+                continue
             results.append(execute_one(tenant, p))
         if once:
             return results

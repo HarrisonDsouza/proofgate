@@ -8,6 +8,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 |---|---|---|---|---|---|---|
 | #1 | Harry (import of Sukhman's code) / `harry` | Combined plan, aligned docs, Sukhman's Python implementation | tech lead | `make ci`: ruff clean, 15 passed | OK | 12:49 |
 | #2 | Harry / `harry` | `make ci` (local lint, tests, secret scan), because GitHub Actions is billing-locked | tech lead | `make ci` PASS | OK | 12:52 |
+| #3 | Harry / `harry` | Tech-lead PR review replaces the API-key reviewer; work log; plan critique | tech lead | `make ci` PASS | OK | 13:03 |
 
 ## Events
 
@@ -21,6 +22,10 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
   - plan-critique
   - code-review-baseline: M1-M17 status and demo-breaking bugs
 - **13:00** The plan critique is in: [research/plan-critique.md](research/plan-critique.md). The automatic PR reviewer was removed (no API key). Reviews now happen in the tech lead's session.
+- **13:05** Security review is in: **FAIL**, with 7 must-fix items before the demo ([research/security-review.md](research/security-review.md)).
+- **13:10** Claims fact-check is in ([research/claims-facts.md](research/claims-facts.md)). The KFF figures are verified; the list of things not to say on stage is in the file.
+- **13:12** Neil's tools research is in ([research/neil-tools.md](research/neil-tools.md)): use `scribe_v3`, then `scribe_v2`; LangSmith redaction hooks are confirmed; no ElevenLabs prize criteria are published. Fixed elevenlabs.md and langsmith-setup.md to match.
+- **13:18** Baseline code review is in: **FAIL** ([research/code-review-baseline.md](research/code-review-baseline.md)). Security review and code review merged into one owner-by-owner list: [FIXES.md](FIXES.md).
 
 ## Checkpoints
 

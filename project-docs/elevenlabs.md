@@ -11,7 +11,7 @@
   - Bolting voice onto the core story could even blur it.
 - **For the separate "Best Project Built with ElevenLabs" prize: a real extra chance.**
   - It is an extra prize category, and Neil works on it in parallel, so it costs the core build nothing.
-  - We have not seen that prize's judging criteria. The ElevenLabs Hacker Guide (a Google Doc linked from the resource guide) may list them. A researcher agent will check after approval.
+  - We have not seen that prize's judging criteria. The ElevenLabs Hacker Guide (a Google Doc linked from the resource guide) may list them. The researcher found no published criteria (the Hacker Guide has none), so ask ElevenLabs staff on site.
 - **For the 1-minute video, a guaranteed practical win.** The submission needs a video with working audio. An ElevenLabs voiceover gives clean, consistent narration that we can regenerate in seconds if the script changes.
 
 **Recommendation:** do option 1 for certain, and option 2 as a contained add-on. Skip options 3 and 4.
@@ -48,7 +48,7 @@
 3. Run `pip install "elevenlabs<3"`. Version 2.x is pinned because a 3.0 pre-release exists.
 4. Spike A, text-to-speech: generate one line of the video script to an mp3 and listen to it.
 5. Spike B, speech-to-text: transcribe a 10-second phone recording.
-   - Try model `scribe_v2` first and fall back to `scribe_v1`. The exact model ids are [VERIFY]; the researcher agent will confirm them.
+   - Try model `scribe_v3` first and fall back to `scribe_v2` (`scribe_v1` is deprecated). See [research/neil-tools.md](research/neil-tools.md) for the exact calls.
 6. After 13:45: build `/api/voice/attest` and the React button, then hand off as above.
 7. From 15:30: generate the final video voiceover from the agreed script.
 

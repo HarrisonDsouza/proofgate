@@ -14,5 +14,6 @@ Team docs for the MongoDB "Agents in Context" hackathon, Toronto, Nov 14 2026. T
 | [elevenlabs.md](elevenlabs.md) | Does ElevenLabs help us win? Options, design, Neil's steps |
 | [langsmith-setup.md](langsmith-setup.md) | LangSmith tracing setup for Neil |
 | [handoffs.md](handoffs.md) | Who hands what to whom, with "done" checks |
+| [FIXES.md](FIXES.md) | Must-fix list by owner, from the security review and code review |
 | [WORKLOG.md](WORKLOG.md) | Every PR, review verdict and event, kept by the tech lead |
 | [research/](research/) | Research and review agent reports (facts, Atlas tier, tools, security, plan, code baseline) |

@@ -80,6 +80,19 @@ def run_rules(tenant: str) -> dict:
     return out
 
 
+SECRET_KEYS = {"session_id", "grant_id"}
+
+
+def _redact(x):
+    """Session ids are bearer tokens (whoever holds one can approve as that reviewer) and grant ids are the
+    single-use capability: the read-only examiner view must never carry either."""
+    if isinstance(x, dict):
+        return {k: _redact(v) for k, v in x.items() if k not in SECRET_KEYS}
+    if isinstance(x, list):
+        return [_redact(v) for v in x]
+    return x
+
+
 def examiner(tenant: str, case_id: str) -> dict:
     """Rebuild one case: proposal -> views -> approval -> gate checks -> grant -> target -> suspension/compensation."""
     db = get_db()
@@ -99,10 +112,10 @@ def examiner(tenant: str, case_id: str) -> dict:
         {"tenant_id": tenant, "session_id": (approval or {}).get("session_id"), "case_id": case_id, "type": "heartbeat"})) if approval else 0
     att = db.attestations.find_one({"tenant_id": tenant, "attestation_id": (approval or {}).get("attestation_id")}, {"_id": 0}) \
         if (approval or {}).get("attestation_id") else None
-    return {"case": case, "proposal": prop, "views": views, "approval": approval, "attestation": att,
+    return _redact({"case": case, "proposal": prop, "views": views, "approval": approval, "attestation": att,
             "gate_decisions": list(db.gate_decisions.find(q, {"_id": 0}).sort("ts", 1)),
             "denial": denial, "grant": grant, "target_log": list(db.target_log.find({"tenant_id": tenant, "record_id": case_id}, {"_id": 0}).sort("ts", 1)),
             "suspension": susp, "compensation": comp,
             "chain": {"review_events_ok": verify_session_chain(db, tenant, approval["session_id"]) if approval else None,
                       "dwell_recomputed_ms": recomputed,
-                      "dwell_matches": (recomputed == approval["active_dwell_ms"]) if approval else None}}
+                      "dwell_matches": (recomputed == approval["active_dwell_ms"]) if approval else None}})

@@ -64,3 +64,36 @@ def test_slow_speech_to_text_does_not_block_heartbeats(client, monkeypatch):
     assert client.get("/healthz").status_code == 200
     assert time.perf_counter() - t0 < 0.8, "the event loop was blocked by the Scribe call"
     t.join()
+
+
+def test_examiner_never_exposes_session_or_grant_ids(client):
+    from pg import auth, rules
+    from pg.db import get_db
+    db = get_db()
+    from pg import review
+    sid = review.open_session(T, "dr-demo")["session_id"]
+    prop = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
+    ap = review.approve(T, sid, prop["proposal_id"], "Reviewed this case thoroughly.")
+    out = rules.examiner(T, ap["case_id"])
+    def keys(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                yield k
+                yield from keys(v)
+        elif isinstance(x, list):
+            for v in x:
+                yield from keys(v)
+    assert not ({"session_id", "grant_id"} & set(keys(out)))
+    assert auth  # silence unused import
+
+
+def test_ops_is_tenant_scoped_and_bounded(client):
+    from pg.db import get_db
+    from pg.observability import record_telemetry
+    db = get_db()
+    record_telemetry(db, "gate_latency_ms", 123.0, tenant_id="tenant-ops-test")
+    mine = client.get("/api/ops", headers={"X-Tenant-Id": "tenant-ops-test"}).json()
+    other = client.get("/api/ops", headers={"X-Tenant-Id": "some-other-tenant"}).json()
+    assert mine.get("gate_latency_ms", {}).get("n", 0) >= 1 and "gate_latency_ms" not in other
+    assert client.get("/api/ops?minutes=0", headers={"X-Tenant-Id": T}).status_code == 422
+    assert client.get("/api/ops?minutes=999999", headers={"X-Tenant-Id": T}).status_code == 422

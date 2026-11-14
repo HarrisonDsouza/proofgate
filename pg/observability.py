@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import time
 from contextlib import contextmanager
@@ -74,10 +75,49 @@ def record_telemetry(db, kind: str, value: float, **meta: Any) -> None:
         log_event("telemetry_write_failed", error=str(e))
 
 
-def traceable(name: str) -> Callable:
-    """LangSmith @traceable if installed and configured, else a no-op."""
+_GRANT_RE = re.compile(r"g_[0-9a-f]{8,}")
+_GRANT_KEYS = {"grant_id", "applied_by_grant"}
+
+
+def _short(v: str) -> str:
+    return v[:6] + "…"
+
+
+def redact_grants(obj: Any) -> Any:
+    """Copy of `obj` with grant ids cut to their first 6 characters. A grant is a 60-second, single-use bearer
+    credential, so full ids must never reach LangSmith. Handles dicts, lists, tuples and strings such as
+    "Grant g_<hex>". Never mutates its input."""
+    if isinstance(obj, dict):
+        return {k: (_short(v) if k in _GRANT_KEYS and isinstance(v, str) else redact_grants(v)) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [redact_grants(v) for v in obj]
+    if isinstance(obj, str):
+        return _GRANT_RE.sub(lambda m: _short(m.group(0)), obj)
+    return obj
+
+
+def _redact_inputs(inputs: dict) -> dict:
+    return redact_grants(inputs)
+
+
+def traceable(name: str, **kw: Any) -> Callable:
+    """LangSmith @traceable if installed, else a no-op. Does nothing extra when LANGSMITH_TRACING is false.
+    Every span redacts grant ids in its inputs and outputs unless the caller passes its own processors."""
+    kw.setdefault("process_inputs", _redact_inputs)
+    kw.setdefault("process_outputs", redact_grants)
     try:
         from langsmith import traceable as _t  # type: ignore
-        return _t(name=name)
+        return _t(name=name, **kw)
     except Exception:  # pragma: no cover
         return lambda f: f
+
+
+def annotate_run(**meta: Any) -> None:
+    """Attach searchable metadata (case_id, decision, ...) to the current LangSmith run. No-op when tracing is off."""
+    try:
+        from langsmith import get_current_run_tree
+        rt = get_current_run_tree()
+        if rt is not None:
+            rt.metadata.update({k: v for k, v in meta.items() if v is not None})
+    except Exception:  # tracing must never break the safety path
+        pass

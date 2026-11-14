@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from pg import agent, config, gate, graph_agent, review, rules, target, voice
+from pg import agent, config, gate, graph_agent, review, rules, target, trace_info, voice
 from pg.auth import console_only, same
 from pg.config import settings
 from pg.db import get_db
@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ProofGate", lifespan=lifespan)
 app.include_router(target.router)
 app.include_router(voice.router)
+app.include_router(trace_info.router)
 
 
 def clean(x):

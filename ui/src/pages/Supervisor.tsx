@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pause, Play, UserX } from 'lucide-react'
+import { Bot, Pause, Play, UserX } from 'lucide-react'
 import { useState } from 'react'
 import { api, ruleName, secs, type Policy } from '../api'
 import { Notice, Spin, Title, useDashboard, type Tone } from '../ui'
@@ -69,6 +69,21 @@ export default function Supervisor() {
       return { tone: 'info', head: r.paused ? 'Agent paused' : 'Agent running', lines: [r.paused ? 'The executor requests no grants until resumed.' : 'The executor picks up approved proposals again.'] }
     })
 
+  type Triaged = { case_id: string; recommendation: string; proposer: string; cited: string[]; clause: string[]; rationale: string; fallback_reason: string | null }
+  const triageNew = () =>
+    act('triage', async () => {
+      const r = await api<{ model: string; key_set: boolean; claims: Triaged[] }>('/api/agent/triage-new', { n: 3 })
+      const llm = r.claims.filter((c) => c.proposer.startsWith('llm:')).length
+      return {
+        tone: 'info',
+        head: `${r.claims.length} new claims triaged: ${llm} by Claude (${r.model}), ${r.claims.length - llm} by the fallback rule`,
+        lines: [
+          ...r.claims.map((c) => `${c.case_id}: ${c.recommendation.toUpperCase()} citing ${c.cited.join(', ')} under ${c.clause.join(', ')} [${c.proposer}]. ${c.rationale}${c.fallback_reason ? ` (fallback: ${c.fallback_reason})` : ''}`),
+          'These are proposals only. Each waits in the review queue; a reviewer must read every cited document and the Atlas gate decides.',
+        ],
+      }
+    })
+
   const d = dash.data
   const burst = d?.last_burst
 
@@ -120,6 +135,16 @@ export default function Supervisor() {
             <button className="btn redline" onClick={halt} disabled={!!busy} style={{ alignSelf: 'flex-end' }}>
               {busy === 'halt' ? <Spin /> : <UserX aria-hidden />}
               Suspend
+            </button>
+          </div>
+          <div className="ctl">
+            <div className="what">
+              <b>Triage agent</b>
+              <span>Claude proposes on 3 new claims; code checks the citations; rules if Claude is unavailable</span>
+            </div>
+            <button className="btn" onClick={triageNew} disabled={!!busy}>
+              {busy === 'triage' ? <Spin /> : <Bot aria-hidden />}
+              Run agent on new claims
             </button>
           </div>
           <div className="ctl">

@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from pg import agent, config, gate, review, rules, target, voice
+from pg import agent, config, gate, llm_agent, review, rules, target, voice
 from pg.auth import console_only, same
 from pg.config import settings
 from pg.db import get_db
@@ -169,6 +169,13 @@ def run_once(x_tenant_id: str = Header(...)):
     db.agent_control.update_one({"_id": f"executor|{x_tenant_id}"},
                                 {"$set": {"last_burst": {"submitted": len(res), "executed": executed, "top_reasons": reasons}}}, upsert=True)
     return clean({"submitted": len(res), "executed": executed, "refused": len(res) - executed, "top_reasons": reasons})
+
+
+@app.post("/api/agent/triage-new", dependencies=[Depends(console_only)])
+def triage_new(body: dict | None = None, x_tenant_id: str = Header(...)):
+    """New claims arrive; the Claude triage agent proposes (rules if no key, error or >8 s). Humans and the gate still decide."""
+    n = int((body or {}).get("n", 3))
+    return clean(llm_agent.triage_new_claims(x_tenant_id, n))
 
 
 @app.post("/api/agent/pause", dependencies=[Depends(console_only)])

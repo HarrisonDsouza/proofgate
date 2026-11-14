@@ -104,6 +104,16 @@ def _close_open_tokens(db, tenant: str, session_id: str) -> None:
             _event(db, tenant, session_id, t["reviewer_id"], t["case_id"], "close", 0, t["evidence_id"])  # once, not per racer
 
 
+def _close_reviewer_tokens_elsewhere(db, tenant: str, reviewer_id: str, keep_session: str) -> None:
+    """Exclusive focus ACROSS sessions (S4): one reviewer reads one document at a time. Without this, a reviewer with
+    five sessions open earns five seconds of dwell per second of wall time and meets the floor in a sixth of the time.
+    Closed tokens stop crediting immediately (heartbeats on a closed token credit 0)."""
+    for t in db.view_tokens.find({"tenant_id": tenant, "reviewer_id": reviewer_id, "closed_at": None,
+                                  "session_id": {"$ne": keep_session}}):
+        if db.view_tokens.find_one_and_update({"_id": t["_id"], "closed_at": None}, {"$set": {"closed_at": now()}}):
+            _event(db, tenant, t["session_id"], reviewer_id, t["case_id"], "close", 0, t["evidence_id"])
+
+
 def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str) -> dict:
     """Serving evidence opens a server view token and closes any other open token (exclusive focus)."""
     db = get_db()
@@ -112,8 +122,9 @@ def fetch_evidence(tenant: str, session_id: str, case_id: str, evidence_id: str)
     ev = next((e for e in (case or {}).get("evidence", []) if e["evidence_id"] == evidence_id), None)
     if not ev:
         raise NotFound("unknown evidence")
-    for attempt in range(15):  # unique partial index `one_open_view_per_session` makes parallel opens collide, not stack
+    for attempt in range(15):  # unique partial index `one_open_view_per_reviewer` makes parallel opens collide, not stack
         _close_open_tokens(db, tenant, session_id)
+        _close_reviewer_tokens_elsewhere(db, tenant, sess["reviewer_id"], session_id)
         tok, t0 = f"VT-{secrets.token_hex(8)}", now()
         try:
             db.view_tokens.insert_one({"tenant_id": tenant, "token": tok, "session_id": session_id, "reviewer_id": sess["reviewer_id"],

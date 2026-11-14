@@ -22,6 +22,8 @@ N = documents in a collection, W = detector window (200), E = events in a sessio
 | Bulk approve | a loop of `approve()`: about 15 round trips per proposal, measured 1.2 s each, about 61 s for 50 | `approve_bulk` is ONE transaction: batched reads, `insert_many`, one `bulk_write` of conditional proposal updates, one `reviewer_state` update, and the hash-chained events in one batch. Measured 1.9 s for 50 on Atlas. All-or-nothing; same documents as the loop (`tests/test_bulk_approve.py`) | `pg/review.py` |
 | Floor-gaming | a reviewer who learned the floor and reviews at 31-37 s from their FIRST case passed every check and defeated the self-baselined CUSUM (the documented null result) | exact one-sided binomial test of how many of the last 30 approvals sit in `[floor, 1.25 x floor]` (H0: at most 25% do). Needs no honest-session data. Raises an examiner flag in `reviewer_flags`, NEVER a suspension (time alone cannot prove intent). Constant work per event: one indexed read of 30 documents | `pg/stats.py:floor_cluster`, `pg/detector.py` |
 
+| Parallel dwell | a reviewer with several sessions open earned dwell in each at once | opening a document closes the reviewer's other open tokens (any session); unique partial index `one_open_view_per_reviewer` makes parallel opens collide instead of stack | `pg/review.py`, `pg/db.py` |
+
 ## Known and deliberately not changed
 - The batch `detector.check_reviewer` replays the reviewer's whole history, O(N). It is only used at startup catch-up and as the test reference.
 - `compensations (status, next_attempt_at)` does not lead with `tenant_id` because the worker is cross-tenant.

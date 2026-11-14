@@ -1,20 +1,21 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { api, store, type Dashboard } from './api'
+import { store, TENANT } from './api'
 import Examiner from './pages/Examiner'
 import Review from './pages/Review'
+import Supervisor from './pages/Supervisor'
+import { useDashboard } from './ui'
 
 function ConsoleKey() {
   const [key, setKey] = useState(store.key())
   return (
-    <label className="key">
-      <span>Console key</span>
+    <label>
+      Console key
       <input
         type="password"
         autoComplete="off"
         value={key}
-        placeholder="paste once"
+        placeholder="Paste once per tab"
         onChange={(e) => {
           setKey(e.target.value)
           store.setKey(e.target.value)
@@ -24,50 +25,56 @@ function ConsoleKey() {
   )
 }
 
-function Ledger() {
-  const { data } = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>('/api/dashboard'), refetchInterval: 2000 })
-  if (!data) return <div className="ledger muted">connecting to Atlas…</div>
+function Connection() {
+  const { isSuccess, isError } = useDashboard()
   return (
-    <div className="ledger" aria-live="polite">
-      <span><b className="num good">{data.executed}</b> executed</span>
-      <span><b className={`num ${data.refused ? 'bad' : ''}`}>{data.refused}</b> refused by the gate</span>
-      <span><b className={`num ${data.reversed ? 'bad' : ''}`}>{data.reversed}</b> reopened</span>
-      <span><b className="num">{data.pending}</b> awaiting review</span>
-      {data.suspended_reviewers.length > 0 && (
-        <span className="tag bad">suspended: {data.suspended_reviewers.join(', ')}</span>
-      )}
+    <div className="meta">
+      <span>
+        <span className={`status-dot ${isSuccess ? 'on' : ''}`} aria-hidden />
+        {isSuccess ? 'Atlas connected' : isError ? 'API unreachable' : 'Connecting…'}
+      </span>
     </div>
   )
 }
 
 export default function App() {
   return (
-    <div className="shell">
-      <header className="top">
+    <div className="app">
+      <aside className="sidebar">
         <div className="brand">
-          <span className="mark" aria-hidden>◆</span>
+          <div className="logo" aria-hidden>PG</div>
           <div>
             <strong>ProofGate</strong>
             <small>No proof of review, no denial.</small>
           </div>
         </div>
-        <nav>
-          <NavLink to="/review">Review</NavLink>
-          <NavLink to="/examiner">Examiner</NavLink>
-          <a href="http://localhost:8080/" target="_blank" rel="noreferrer">Supervisor ↗</a>
+        <nav className="nav" aria-label="Main">
+          <div className="nav-label">Workspace</div>
+          <NavLink to="/review"><span className="ico" aria-hidden>▤</span>Review queue</NavLink>
+          <NavLink to="/supervisor"><span className="ico" aria-hidden>◎</span>Supervisor</NavLink>
+          <NavLink to="/examiner"><span className="ico" aria-hidden>⌕</span>Examiner</NavLink>
         </nav>
-        <ConsoleKey />
-      </header>
-      <Ledger />
-      <main>
+        <div className="sidebar-foot">
+          <div className="meta">
+            <span>Tenant</span>
+            <span className="mono">{TENANT}</span>
+          </div>
+          <ConsoleKey />
+          <Connection />
+        </div>
+      </aside>
+      <main className="content">
         <Routes>
           <Route path="/" element={<Navigate to="/review" replace />} />
           <Route path="/review" element={<Review />} />
+          <Route path="/supervisor" element={<Supervisor />} />
           <Route path="/examiner" element={<Examiner />} />
           <Route path="/examiner/:caseId" element={<Examiner />} />
         </Routes>
+        <p className="footnote">
+          Synthetic data only. Every decision is made by one MongoDB Atlas transaction; this console only displays it.
+        </p>
       </main>
-      <footer>Synthetic data only. Every decision is made by one MongoDB Atlas transaction; this page only shows it.</footer>
     </div>
   )
 }

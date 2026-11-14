@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ruleName, secs } from '../api'
+import { Banner, Card, PageHead } from '../ui'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Ex = Record<string, any>
@@ -12,38 +13,35 @@ function Step({ n, title, ok, children }: { n: number; title: string; ok?: boole
   return (
     <li className="step">
       <div className={`dot ${ok === true ? 'good' : ok === false ? 'bad' : ''}`} aria-label={`Step ${n}${ok === true ? ', passed' : ok === false ? ', failed' : ''}`}>
-        {ok === true ? '✓' : ok === false ? '✗' : n}
+        {ok === true ? '✓' : ok === false ? '✕' : n}
       </div>
-      <div className="body">
-        <h3>{title}</h3>
-        {children}
-      </div>
+      <Card title={title}>
+        <div className="card-body">{children}</div>
+      </Card>
     </li>
   )
 }
 
 function Verdict({ d }: { d: Ex }) {
   const g = d.gate_decisions?.at(-1)
-  if (!g) return <div className="result info verdict"><strong>{d.case.case_id}: no gate decision yet</strong></div>
+  if (!g) return <Banner tone="info" title={`${d.case.case_id}: no gate decision yet`} lines={['The agent has proposed; no approval has reached the gate.']} />
   const failed = (g.checks ?? []).filter((c: any) => !c.pass)
   const nChecks = (g.checks ?? []).length
   if (g.decision === 'ALLOW') {
     const reopened = d.compensation?.status === 'confirmed'
-    return (
-      <div className={`result ${reopened ? 'bad' : 'good'} verdict`}>
-        <strong>
-          {reopened ? 'ALLOWED, then REOPENED' : 'ALLOWED'} · server dwell {secs(d.approval?.active_dwell_ms)} · {nChecks - failed.length}/{nChecks} checks
-          {d.denial ? ` · denial ${d.denial.status}` : ''}
-          {d.denial?.readback ? `, read back ${d.denial.readback.status}` : ''}
-        </strong>
-      </div>
-    )
+    const lines = [
+      `Server-timed dwell ${secs(d.approval?.active_dwell_ms)} · ${nChecks - failed.length} of ${nChecks} gate checks passed`,
+      d.denial ? `Denial ${d.denial.status}${d.denial.readback ? `, read back as ${d.denial.readback.status}` : ''}` : '',
+      reopened ? 'Reviewer later suspended; the denial was reopened in the claims system and read back.' : '',
+    ].filter(Boolean)
+    return <Banner tone={reopened ? 'bad' : 'good'} title={reopened ? `${d.case.case_id} allowed, then reopened` : `${d.case.case_id} allowed`} lines={lines} />
   }
   return (
-    <div className="result bad verdict">
-      <strong>REFUSED · {failed.length ? ruleName(failed[0].rule) : 'see checks'}</strong>
-      {failed.length > 1 && <div>Also failed: {failed.slice(1).map((c: any) => ruleName(c.rule)).join(' · ')}</div>}
-    </div>
+    <Banner
+      tone="bad"
+      title={`${d.case.case_id} refused · ${failed.length ? ruleName(failed[0].rule) : 'see checks'}`}
+      lines={failed.length > 1 ? [`Also failed: ${failed.slice(1).map((c: any) => ruleName(c.rule)).join(' · ')}`] : ['No grant was minted; the claims system was never changed.']}
+    />
   )
 }
 
@@ -60,25 +58,30 @@ export default function Examiner() {
   const d = q.data
 
   return (
-    <div className="examiner">
+    <>
+      <PageHead title="Examiner" sub="Rebuild any case from the documents stored in Atlas: what the agent proposed, what the reviewer opened, what the gate checked, and what the claims system did." />
+      <Card>
       <form
-        className="panel sessionbar"
+        className="ex-search"
         onSubmit={(e) => {
           e.preventDefault()
           nav(`/examiner/${input.trim()}`)
         }}
       >
-        <label>
-          Case
-          <input className="mono" value={input} onChange={(e) => setInput(e.target.value)} />
+        <label className="field">
+          Case ID
+          <input className="mono" value={input} onChange={(e) => setInput(e.target.value)} style={{ width: 200 }} />
         </label>
-        <button className="primary">Rebuild from Atlas</button>
-        <span className="muted">Everything below is read from stored documents, not from logs or this browser.</span>
+        <button className="btn primary">Rebuild from Atlas</button>
+        <span className="subtle" style={{ fontSize: 13, alignSelf: 'center' }}>Read from stored documents, not from logs or this browser.</span>
       </form>
+      </Card>
+      <div style={{ height: 20 }} />
 
-      {q.isLoading && <p className="muted">Reading {caseId} from Atlas…</p>}
-      {q.isError && <p className="result bad">Could not load {caseId}.</p>}
-      {d && !d.case && <p className="result bad">No case {caseId} in this tenant.</p>}
+      {!caseId && <Card><div className="empty">Enter a case ID to reconstruct its full decision trail.</div></Card>}
+      {q.isLoading && <Card><div className="empty">Reading {caseId} from Atlas…</div></Card>}
+      {q.isError && <Banner tone="bad" title={`Could not load ${caseId}`} />}
+      {d && !d.case && <Banner tone="bad" title={`No case ${caseId} in this tenant`} />}
       {d?.case && <Verdict d={d} />}
       {d?.case && (
         <ol className="timeline">
@@ -87,13 +90,13 @@ export default function Examiner() {
               <>
                 <p>
                   <span className="mono">{d.proposal.agent_id}</span> proposed <strong>{d.proposal.recommendation?.toUpperCase()}</strong> ·
-                  operator <span className="mono">{d.proposal.operator_id}</span> · status <span className="tag">{d.proposal.status}</span>
+                  operator <span className="mono">{d.proposal.operator_id}</span> · status <span className="badge">{d.proposal.status}</span>
                 </p>
                 <p className="muted">{d.proposal.rationale}</p>
                 <p>
                   Cited:{' '}
                   {d.proposal.cited_evidence?.map((c: any) => (
-                    <span key={c.evidence_id} className="tag mono">
+                    <span key={c.evidence_id} className="badge mono">
                       {c.evidence_id}
                     </span>
                   ))}
@@ -121,7 +124,7 @@ export default function Examiner() {
                       <td className="mono">{v.evidence_id}</td>
                       <td className="mono">{secs(v.active_ms)}</td>
                       <td className="mono">
-                        {secs(v.open_ms)} {v.idle_flag && <span className="tag bad">mostly idle</span>}
+                        {secs(v.open_ms)} {v.idle_flag && <span className="badge bad">mostly idle</span>}
                       </td>
                       <td className="mono muted">{String(v.evidence_hash ?? v.hash ?? '').slice(0, 12)}…</td>
                     </tr>
@@ -138,7 +141,7 @@ export default function Examiner() {
               <>
                 <p>
                   <span className="mono">{d.approval.reviewer_id}</span> · server dwell <b className="mono">{secs(d.approval.active_dwell_ms)}</b> ·
-                  status <span className="tag">{d.approval.status}</span> · {when(d.approval.created_at)}
+                  status <span className="badge">{d.approval.status}</span> · {when(d.approval.created_at)}
                 </p>
                 {d.approval.attestation_text && <blockquote>{d.approval.attestation_text}</blockquote>}
                 {d.approval.client_supplied_ignored && Object.values(d.approval.client_supplied_ignored).some((v) => v != null) && (
@@ -162,14 +165,14 @@ export default function Examiner() {
               d.gate_decisions.map((g: any) => (
                 <div key={g.decision_id ?? g.ts} className="gate">
                   <p>
-                    <span className={`tag ${g.decision === 'ALLOW' ? 'good' : 'bad'}`}>{g.decision}</span> policy v{g.policy_version} ·
+                    <span className={`badge ${g.decision === 'ALLOW' ? 'good' : 'bad'}`}>{g.decision}</span> policy v{g.policy_version} ·
                     transaction attempts <b className="mono">{g.txn_attempts}</b> · {when(g.ts)}
                   </p>
                   <ul className="checks">
                     {g.checks?.map((c: any) => (
-                      <li key={c.rule} className={c.pass ? 'good-text' : 'bad-text'}>
-                        <span className="mono">{c.pass ? '✓' : '✗'}</span> {ruleName(c.rule)}
-                        {!c.pass && c.detail && <span className="muted"> — {c.detail}</span>}
+                      <li key={c.rule}>
+                        <span className={`mark ${c.pass ? 'good-text' : 'bad-text'}`} aria-label={c.pass ? 'passed' : 'failed'}>{c.pass ? '✓' : '✕'}</span>
+                        <span>{ruleName(c.rule)}{!c.pass && c.detail && <span className="detail"> · {String(c.detail)}</span>}</span>
                       </li>
                     ))}
                   </ul>
@@ -183,7 +186,7 @@ export default function Examiner() {
           <Step n={5} title="Claims system" ok={d.denial ? d.denial.status === 'CONFIRMED' : null}>
             {d.denial ? (
               <p>
-                Denial <span className="mono">{d.denial.denial_id}</span> <span className="tag">{d.denial.status}</span>
+                Denial <span className="mono">{d.denial.denial_id}</span> <span className="badge">{d.denial.status}</span>
                 {d.denial.readback && (
                   <>
                     {' '}
@@ -193,7 +196,7 @@ export default function Examiner() {
                 {d.grant && (
                   <>
                     {' '}
-                    · single-use grant <span className="tag">{d.grant.status}</span>
+                    · single-use grant <span className="badge">{d.grant.status}</span>
                   </>
                 )}
               </p>
@@ -201,7 +204,7 @@ export default function Examiner() {
               <p className="muted">No denial executed.</p>
             )}
             {d.target_log?.length > 0 && (
-              <ul className="log mono">
+              <ul className="log">
                 {d.target_log.map((t: any, i: number) => (
                   <li key={i} className={/REFUSED/.test(t.outcome) ? 'bad-text' : ''}>
                     {when(t.ts)} {t.op} → {t.outcome} <span className="muted">by {t.caller}</span>
@@ -215,20 +218,20 @@ export default function Examiner() {
             {d.suspension ? (
               <p>
                 <span className="mono">{d.suspension.reviewer_id}</span> suspended by <b>{d.suspension.source}</b> · rule{' '}
-                <span className="tag bad">{d.suspension.rule}</span> · {when(d.suspension.ts)}
+                <span className="badge bad">{d.suspension.rule}</span> · {when(d.suspension.ts)}
               </p>
             ) : (
               <p className="muted">Reviewer not suspended.</p>
             )}
             {d.compensation && (
               <p>
-                Denial reopened in the claims system: <span className="tag">{d.compensation.status}</span>
+                Denial reopened in the claims system: <span className="badge">{d.compensation.status}</span>
                 {d.compensation.readback && <> · read back <span className="mono">{d.compensation.readback.status}</span></>}
               </p>
             )}
           </Step>
         </ol>
       )}
-    </div>
+    </>
   )
 }

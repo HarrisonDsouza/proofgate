@@ -62,8 +62,10 @@ export type Dashboard = {
   refused: number
   pending: number
   suspended_reviewers: string[]
+  suspensions: Suspension[]
   last_burst: { submitted: number; executed: number; top_reasons: Record<string, number> } | null
 }
+export type Suspension = { suspension_id: string; reviewer_id: string; active: boolean; source: string; rule: string; ts: string }
 export type RunOnce = { submitted: number; executed: number; refused: number; top_reasons: Record<string, number> }
 
 export const RULE_NAMES: Record<string, string> = {

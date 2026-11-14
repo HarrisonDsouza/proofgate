@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, ruleName, secs, store, TENANT, type Policy, type QueueItem, type RunOnce, type Session } from '../api'
 import { useHeartbeat } from '../useHeartbeat'
+import { Banner, Card, PageHead, Stats, type Tone } from '../ui'
 
 const REVIEWERS = ['dr-demo', 'dr-stamper', 'dr-skim', 'dr-cardio', 'dr-expired', 'vol-1', 'vol-2', 'vol-3']
 
-type Result = { tone: 'good' | 'bad' | 'info'; title: string; lines: string[] }
+type Result = { tone: Tone; title: string; lines: string[]; caseId?: string }
 
 function reasons(r: Record<string, number>) {
   return Object.entries(r)
@@ -14,9 +15,9 @@ function reasons(r: Record<string, number>) {
     .map(([k, v]) => `${ruleName(k)}: refused ${v}`)
 }
 
-function errText(e: unknown) {
+export function errText(e: unknown) {
   if (e instanceof ApiError) {
-    if (e.status === 401) return 'Console key missing or wrong (top right).'
+    if (e.status === 401) return 'Console key missing or wrong. Paste it in the sidebar.'
     const b = e.body as { detail?: unknown; error?: unknown } | null
     return `${e.status}: ${JSON.stringify(b?.detail ?? b?.error ?? b)}`
   }
@@ -52,8 +53,8 @@ export default function Review() {
 
   const total = Object.values(credited).reduce((a, b) => a + b, 0)
   const cited = picked?.cited_evidence ?? []
-  const allOpened = cited.every((e) => (credited[e.evidence_id] ?? -1) >= 0)
-  const ready = cited.length > 0 && allOpened && total >= floor && cited.every((e) => (credited[e.evidence_id] ?? 0) >= itemFloor)
+  const openedCited = cited.filter((e) => credited[e.evidence_id] !== undefined).length
+  const ready = cited.length > 0 && total >= floor && cited.every((e) => (credited[e.evidence_id] ?? 0) >= itemFloor)
 
   async function start() {
     setBusy('session')
@@ -83,21 +84,25 @@ export default function Review() {
 
   async function openEvidence(eid: string) {
     if (!picked) return
-    const r = await api<{ view_token: string; content: string }>(`/api/cases/${picked.case_id}/evidence/${eid}`)
-    setCredited((c) => ({ ...c, [eid]: c[eid] ?? 0 }))
-    setOpen({ eid, token: r.view_token, content: r.content })
+    try {
+      const r = await api<{ view_token: string; content: string }>(`/api/cases/${picked.case_id}/evidence/${eid}`)
+      setCredited((c) => ({ ...c, [eid]: c[eid] ?? 0 }))
+      setOpen({ eid, token: r.view_token, content: r.content })
+    } catch (e) {
+      setResult({ tone: 'bad', title: 'Could not open evidence', lines: [errText(e)] })
+    }
   }
 
-  async function runAgent(title: string, submitted?: number) {
+  async function runAgent(title: string, submitted?: number, caseId?: string) {
     const r = await api<RunOnce>('/api/agent/run-once', {})
     const n = submitted ?? r.submitted
     const dash = await api<{ suspended_reviewers: string[] }>('/api/dashboard')
     const suspended = dash.suspended_reviewers.includes(session?.reviewer_id ?? '')
-    const head = `Executed ${r.executed} of ${n}` + (suspended ? ` · ${session?.reviewer_id} SUSPENDED` : '')
+    const head = `Executed ${r.executed} of ${n}` + (suspended ? ` · ${session?.reviewer_id} suspended` : '')
     const lines = [`${title}: refused ${n - r.executed}.`, ...reasons(r.top_reasons)]
     if (suspended) lines.push('Grants revoked, pending approvals sent back to review, executed denials queued to reopen.')
     if (r.executed > 0 && !suspended) lines.push('Denial executed and read back from the claims system.')
-    setResult({ tone: r.executed > 0 && !suspended ? 'good' : 'bad', title: head, lines })
+    setResult({ tone: r.executed > 0 && !suspended ? 'good' : 'bad', title: head, lines, caseId })
     qc.invalidateQueries()
   }
 
@@ -108,9 +113,9 @@ export default function Review() {
       if (open) await api(`/api/views/${open.token}/close`, {})
       setOpen(null)
       await api('/api/approvals', { proposal_id: picked.proposal_id, attestation_text: attest })
-      await runAgent(`Case ${picked.case_id}`, 1)
+      await runAgent(`Case ${picked.case_id}`, 1, picked.case_id)
     } catch (e) {
-      setResult({ tone: 'bad', title: 'Approval refused', lines: [errText(e)] })
+      setResult({ tone: 'bad', title: 'Approval refused', lines: [errText(e)], caseId: picked.case_id })
     } finally {
       setBusy(null)
     }
@@ -131,127 +136,163 @@ export default function Review() {
   }
 
   return (
-    <div className="review">
-      <section className="panel sessionbar">
-        <label>
-          Reviewer
-          <select value={who} onChange={(e) => setWho(e.target.value)}>
-            {REVIEWERS.map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
-        </label>
-        <button className="primary" onClick={start} disabled={busy === 'session'}>
-          {session ? 'New session' : 'Start session'}
-        </button>
-        {session && (
-          <span className="muted mono">
-            {session.reviewer_id} · {session.specialty ?? '—'} · session {session.session_id}
-          </span>
-        )}
-        <span className="spacer" />
-        <button className="danger" onClick={bulk} disabled={!session || !!busy} title="The rubber-stamp button. Try it.">
-          Select all, approve 50
-        </button>
-      </section>
+    <>
+      <PageHead
+        title="Review queue"
+        sub="The agent proposes claim denials. None can execute until a credentialed reviewer has opened every cited item, timed by the server."
+      />
+      <Stats />
 
       {result && (
-        <section className={`result ${result.tone}`} role={result.tone === 'bad' ? 'alert' : 'status'}>
-          <strong>{result.title}</strong>
-          {result.lines.map((l) => (
-            <div key={l}>{l}</div>
-          ))}
-          {picked && result.tone !== 'info' && <Link to={`/examiner/${picked.case_id}`}>Open the examiner for {picked.case_id} →</Link>}
-        </section>
+        <Banner
+          tone={result.tone}
+          title={result.title}
+          lines={result.lines}
+          action={result.caseId && result.tone !== 'info' ? <Link className="btn" to={`/examiner/${result.caseId}`}>Open in examiner →</Link> : undefined}
+        />
       )}
 
-      <div className="cols">
-        <section className="panel queue">
-          <h2>Queue</h2>
-          {!session && <p className="muted">Start a session to see the cases routed to your specialty.</p>}
-          {queue.isError && <p className="bad-text">{errText(queue.error)}</p>}
-          {queue.data?.length === 0 && <p className="muted">Nothing awaiting review.</p>}
-          <ul>
-            {queue.data?.map((p) => (
-              <li key={p.proposal_id}>
-                <button className={`qitem ${picked?.proposal_id === p.proposal_id ? 'on' : ''}`} onClick={() => pick(p)}>
-                  <span className="mono">{p.case_id}</span>
-                  <span>{p.summary}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+      <Card>
+        <div className="toolbar">
+          <label className="field">
+            Reviewer
+            <select value={who} onChange={(e) => setWho(e.target.value)}>
+              {REVIEWERS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn primary" onClick={start} disabled={busy === 'session'}>
+            {session ? 'New session' : 'Start session'}
+          </button>
+          {session && (
+            <div className="who">
+              Signed in as <b className="mono">{session.reviewer_id}</b>
+              {session.specialty && <> · <span className="badge">{session.specialty}</span></>}
+            </div>
+          )}
+          <span className="spacer" />
+          <button className="btn danger" onClick={bulk} disabled={!session || !!busy} title="The rubber-stamp button. The gate will refuse it.">
+            Select all · approve 50
+          </button>
+        </div>
+      </Card>
 
-        <section className="panel case">
+      <div className="review-grid">
+        <Card title="Queue" hint={queue.data ? `${queue.data.length} shown` : undefined}>
+          {!session && <div className="empty">Start a session to see the cases routed to your specialty.</div>}
+          {queue.isError && <div className="empty bad-text">{errText(queue.error)}</div>}
+          {queue.data?.length === 0 && <div className="empty">Nothing awaiting review.</div>}
+          {!!queue.data?.length && (
+            <ul className="queue-list">
+              {queue.data.map((p) => (
+                <li key={p.proposal_id}>
+                  <button className={`qitem ${picked?.proposal_id === p.proposal_id ? 'on' : ''}`} onClick={() => pick(p)}>
+                    <span className="id">{p.case_id}</span>
+                    <span className="amt">${p.billed_amount?.toLocaleString()}</span>
+                    <span className="sum">{p.summary}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
           {!picked ? (
-            <p className="muted">Pick a case. The agent has proposed a denial; it cannot run until you review the evidence it cited.</p>
+            <div className="empty" style={{ padding: '64px 24px' }}>
+              Pick a case from the queue. The agent has proposed a denial; it cannot run until you review the evidence it cited.
+            </div>
           ) : (
-            <>
-              <header className="casehead">
-                <div>
-                  <h2 className="mono">{picked.case_id}</h2>
-                  <p>{picked.summary}</p>
+            <div className="card-body section-gap">
+              <div>
+                <div className="case-top">
+                  <div>
+                    <h2>{picked.case_id}</h2>
+                    <div className="muted">{picked.summary}</div>
+                  </div>
+                  <div className="amount">
+                    <div className="subtle" style={{ fontSize: 12 }}>Billed</div>
+                    <div className="v">${picked.billed_amount?.toLocaleString()}</div>
+                  </div>
                 </div>
-                <div className="amount mono">${picked.billed_amount?.toLocaleString()}</div>
-              </header>
-              <div className="agent">
-                <span className="label">Agent proposes</span> <strong>DENY</strong>
-                <p>{picked.rationale}</p>
+                <div className="proposal">
+                  <div className="row">
+                    <span className="eyebrow" style={{ margin: 0 }}>Agent proposal</span>
+                    <span className="badge bad">Deny</span>
+                  </div>
+                  <p>{picked.rationale}</p>
+                </div>
               </div>
 
-              <h3>Evidence the agent cited</h3>
-              <ol className="evidence">
-                {picked.all_evidence.map((e) => {
-                  const isCited = cited.some((c) => c.evidence_id === e.evidence_id)
-                  const ms = credited[e.evidence_id]
-                  return (
-                    <li key={e.evidence_id} className={open?.eid === e.evidence_id ? 'open' : ''}>
-                      <button onClick={() => openEvidence(e.evidence_id)}>
-                        <span className="mono">{e.evidence_id}</span> {e.label}
-                        {isCited && <span className="tag">cited</span>}
-                      </button>
-                      <span className={`mono ${ms !== undefined && ms >= itemFloor ? 'good-text' : 'muted'}`}>
-                        {ms === undefined ? 'not opened' : secs(ms)}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ol>
-              {open && <pre className="doc">{open.content}</pre>}
-
-              <div className="meter" aria-label="server-credited review time">
-                <div className="bar">
-                  <i style={{ width: `${Math.min(100, (total / floor) * 100)}%` }} />
+              <div>
+                <div className="row" style={{ marginBottom: 8 }}>
+                  <p className="eyebrow" style={{ margin: 0 }}>Evidence</p>
+                  <span className="subtle" style={{ fontSize: 13 }}>
+                    {openedCited} of {cited.length} cited items opened
+                  </span>
                 </div>
-                <div className="mono">
-                  {secs(total)} credited by the server · floor {secs(floor)} (policy v{active?.version ?? '?'})
+                <div className="ev-list">
+                  {picked.all_evidence.map((e) => {
+                    const isCited = cited.some((c) => c.evidence_id === e.evidence_id)
+                    const ms = credited[e.evidence_id]
+                    const met = ms !== undefined && ms >= itemFloor
+                    return (
+                      <button key={e.evidence_id} className={`ev ${open?.eid === e.evidence_id ? 'open' : ''}`} onClick={() => openEvidence(e.evidence_id)}>
+                        <span className="eid">{e.evidence_id}</span>
+                        <span className="t">
+                          <span>
+                            {e.label} {isCited && <span className="badge accent">Cited</span>}
+                          </span>
+                          {ms !== undefined && (
+                            <span className="mini" aria-hidden>
+                              <i style={{ width: `${Math.min(100, (ms / itemFloor) * 100)}%` }} />
+                            </span>
+                          )}
+                        </span>
+                        <span className={`time ${met ? 'good-text' : 'subtle'}`}>{ms === undefined ? 'Not opened' : secs(ms)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {open && <pre className="doc" style={{ marginTop: 12 }}>{open.content}</pre>}
+              </div>
+
+              <div className="meter" aria-label="Server-credited review time">
+                <div className="top">
+                  <span className="big">{secs(total)}</span>
+                  <span className="of">credited by the server · floor {secs(floor)}</span>
+                  <span className="spacer" />
+                  <span className="badge mono">policy v{active?.version ?? '?'}</span>
+                </div>
+                <div className={`bar ${total >= floor ? 'done' : ''}`}>
+                  <i style={{ width: `${Math.min(100, (total / floor) * 100)}%` }} />
                 </div>
                 <small className="muted">
                   Counted only while this tab is visible and you have used it in the last 15 s. The browser cannot add time.
                 </small>
               </div>
 
-              <label className="attest">
+              <label className="field">
                 Attestation
                 <textarea
                   value={attest}
                   onChange={(e) => setAttest(e.target.value)}
-                  placeholder="What did you check? e.g. Prior-auth letter covers a different code than the one billed."
+                  placeholder="What did you check? e.g. The prior-auth letter covers a different code than the one billed."
                 />
               </label>
-              <div className="actions">
-                <button className="primary" onClick={approve} disabled={!!busy}>
-                  Approve denial
+              <div className="approve-row">
+                <button className="btn primary lg" onClick={approve} disabled={!!busy}>
+                  {busy === 'approve' ? 'Checking in Atlas…' : 'Approve denial'}
                 </button>
-                <span className="muted">
-                  {ready ? 'Review requirements met. The gate will still check.' : 'You can press it early: the gate will refuse and say why.'}
+                <span className={ready ? 'good-text' : 'muted'} style={{ fontSize: 14 }}>
+                  {ready ? '✓ Review requirements met. The gate will still check.' : 'You can press it early: the gate will refuse and say why.'}
                 </span>
               </div>
-            </>
+            </div>
           )}
-        </section>
+        </Card>
       </div>
-    </div>
+    </>
   )
 }

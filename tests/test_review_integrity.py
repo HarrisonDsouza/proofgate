@@ -53,6 +53,8 @@ def test_confirm_after_suspension_queues_compensation_and_does_not_mark_executed
 
 
 def test_parallel_heartbeats_are_credited_once():
+    """Total credit can never exceed the wall time the token has been open. Without the compare-and-set, ten parallel
+    heartbeats each credit the same gap, so credit is about ten times the elapsed time (network speed does not matter)."""
     from pg import review
     from pg.db import get_db
     db = get_db()
@@ -61,13 +63,15 @@ def test_parallel_heartbeats_are_credited_once():
     pr = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
     ev = db.cases.find_one({"tenant_id": T, "case_id": pr["case_id"]})["evidence"][0]["evidence_id"]
     tok = review.fetch_evidence(T, sid, pr["case_id"], ev)["view_token"]
+    opened = time.time()
     time.sleep(2.0)
     res = []
     ths = [threading.Thread(target=lambda: res.append(review.heartbeat(T, tok, True, 100))) for _ in range(10)]
     [t.start() for t in ths]
     [t.join() for t in ths]
+    elapsed_ms = (time.time() - opened) * 1000
     credited = sum(r["credited_ms"] for r in res)
-    assert 1500 <= credited <= 3500, f"10 parallel heartbeats credited {credited} ms for ~2 s of wall time"
+    assert credited <= elapsed_ms + 250, f"10 parallel heartbeats credited {credited} ms in {elapsed_ms:.0f} ms of wall time"
 
 
 def test_parallel_evidence_opens_leave_one_open_token():

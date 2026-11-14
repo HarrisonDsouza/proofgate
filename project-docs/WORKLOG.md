@@ -64,6 +64,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - 15:48 Review timer reworked (2 s beats, live preview, flush on switch/approve, paused state) and spinners on every Atlas action (5db2678).
 - 15:52 LLM triage agent for new claims (d5b8032): strict tool call, code validates citations/clauses, rules fallback; tested on Atlas (fallback path, no ANTHROPIC_API_KEY set) and in the browser; 9 offline tests.
 - 15:57 Judge panel (16 provided personas, simulated) in project-docs/research/judge-panel-review.md: 15 of 16 top-6 votes. make test-conflict re-run, all PASS, saved to docs/test-conflict.txt; demo.md fallbacks fixed (5666a3d). Demo tenant needs `make demo-case` before judging.
+- 16:20 Harry chose option A (sponsor-only) from project-docs/plans/agent-guide-gap-plan.md. Anthropic triage agent removed. New LangGraph agent pg/graph_agent.py: Voyage embeddings + Atlas $vectorSearch -> Voyage rerank -> rerank-as-judge decision (deny only on a 0.05 margin) -> code validation -> pending proposal; state checkpointed in Atlas (langgraph-checkpoint-mongodb). 6 new tests on Atlas with a fake Voyage client. VOYAGE_API_KEY not set, so live runs use the labelled rules-v1 fallback; the Voyage path is untested against the real API. Seed and eval unchanged (rule). README has the guide checklist.
 
 ## Checkpoints
 

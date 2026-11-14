@@ -26,7 +26,7 @@ explain:      ; curl -s -H "X-Tenant-Id: payer-acme" localhost:8080/api/explain/
 codes:        ; python -m data.pipeline.codes
 calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live
 calibrate-prd:      ; python -m eval.calibrate_detector --prd-model
-triage-new:   ; python -c "import json,sys; from pg.llm_agent import triage_new_claims as t; print(json.dumps(t('payer-acme', 3), indent=1, default=str))"
+triage-new:   ; python -c "import json,sys; from pg.graph_agent import triage_new_claims as t; print(json.dumps(t('payer-acme', 3), indent=1, default=str))"
 eval:         ; python -m eval.simulate --seed 1
 eval-heldout: ; python -m eval.simulate --seed 20261114
 baseline:     ; python -m eval.simulate --seed 20261114 --baseline

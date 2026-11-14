@@ -126,6 +126,38 @@ The `Makefile` loads `.env` for you.
    - as `dr-stamper`, "Select all, approve 50" → executed 0, reviewer suspended
    - as `dr-demo`, open each cited item, approve → executed and read back
 
+## The triage agent (LangGraph, sponsor resources only)
+
+`pg/graph_agent.py`. Run it from the Supervisor page ("Run agent on new claims"), `make triage-new`, or `POST /api/agent/triage-new`.
+
+```
+load_case -> retrieve_clauses -> rerank -> decide -> validate -> write_proposal
+```
+
+| Node | What it does | Resource |
+|---|---|---|
+| retrieve_clauses | Embeds the claim and finds candidate policy clauses with `$vectorSearch` (filtered by tenant) | Voyage `voyage-3.5`, Atlas Vector Search |
+| rerank | Orders the candidates against the claim's evidence; the top one governs | Voyage `rerank-2.5` |
+| decide | Scores the evidence against "condition met" vs "not met"; proposes **deny only if "not met" wins by 0.05**, otherwise pay; picks the documents a reviewer must read | Voyage `rerank-2.5` |
+| validate | Code, not the model, fixes the record: cited ids must exist, hashes come from the case, the clause must be real. A failed check falls back to the rule, labelled | Python |
+| write_proposal | The agent's action: writes the case, target record and a `pending_review` proposal with `proposer`, `agent_trace`, `agent_scores` | Atlas |
+| (all) | Graph state checkpointed per case (`agent_checkpoints`) so a crash resumes mid-case; nodes traced | `langgraph-checkpoint-mongodb`, LangSmith |
+
+The agent proposes only. It never sees a grant or calls the claims system; a reviewer and the gate still decide every denial.
+
+### Resource guide checklist
+
+| Guide resource | Used? | Where |
+|---|---|---|
+| MongoDB Atlas Hackathon Sandbox | Yes | All state; transactions, `$jsonSchema`, change streams |
+| Atlas Vector Search | Yes | `pg/graph_agent.py` `vector_search`, index `policy_clause_vec` |
+| Voyage AI (embeddings + reranker) | Yes, needs `VOYAGE_API_KEY` | `pg/graph_agent.py` |
+| LangGraph + MongoDB checkpointer | Yes | `pg/graph_agent.py` `build_graph`, `_checkpointer` |
+| LangSmith | Wired, needs `LANGSMITH_API_KEY` + `LANGSMITH_TRACING=true` | `pg/observability.py`, graph nodes |
+| ElevenLabs | Wired, needs `ELEVENLABS_API_KEY` | `pg/voice.py` (speech-to-text attestation, voice) |
+| MongoDB Agent Skills, MCP Server | Used while building (dev tooling), not in the app | — |
+| Atlas Search, Automated Embeddings, GraphRAG, LangChain memory | Not used | — |
+
 ## Results
 
 Filled **only** from runs on the Atlas sandbox today, pasted unedited. Full output: [docs/eval-heldout.txt](docs/eval-heldout.txt), [docs/eval-baseline.txt](docs/eval-baseline.txt). Pre-registration: [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md).
@@ -179,7 +211,8 @@ drifter       4    64    64       0     0  {} {}
 - **Timestamps:** `PREREGISTRATION.md` says "Committed at: 14:58 EST"; that line is a typo. Git shows the pre-registration commit `7df270e` at **14:25** and the held-out results commit `350d06c` at **14:31**.
 - The held-out run used commit `7df270e`; the baseline used `7597a52` (after the gate hardening PR merged). An earlier baseline attempt was discarded because its detector thread crashed when tests ran on the cluster at the same time.
 - After both runs, "approve 50" was changed to write its 50 approval records in one transaction (it took ~5 minutes on the sandbox before). The gate logic and what it checks did not change.
-- Not built today: Vector Search / Voyage AI, an LLM-written rationale, the account-freeze action, a read-only MCP server. LangSmith tracing is wired to the agent's triage step (not the executor, whose output carries the grant token) and only records when `LANGSMITH_TRACING=true`.
+- The triage agent for **new** claims is a LangGraph graph (`pg/graph_agent.py`, added 16:05-16:20, after the eval). The seeded demo data and both eval runs above used the deterministic rule (`rules-v1`), so no result above comes from the graph agent. Its decision quality has not been measured. Without `VOYAGE_API_KEY` it runs the rule and labels every proposal `rules-v1`.
+- Not built today: an LLM-written rationale (no sponsor offers a text LLM, and we chose not to add a non-sponsor one), the account-freeze action, a read-only MCP server in the app. LangSmith traces the agent's graph nodes (never the executor, whose output carries the grant token) and only records when `LANGSMITH_TRACING=true`.
 - Synthetic cases built on real public-domain ICD-10-CM and HCPCS codes. Not a medical or claims tool.
 
 ## Rules everyone follows

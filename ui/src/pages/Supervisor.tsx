@@ -69,14 +69,14 @@ export default function Supervisor() {
       return { tone: 'info', head: r.paused ? 'Agent paused' : 'Agent running', lines: [r.paused ? 'The executor requests no grants until resumed.' : 'The executor picks up approved proposals again.'] }
     })
 
-  type Triaged = { case_id: string; recommendation: string; proposer: string; cited: string[]; clause: string[]; rationale: string; fallback_reason: string | null }
+  type Triaged = { case_id: string; recommendation: string; proposer: string; cited: string[]; clause: string[]; rationale: string; fallback_reason: string | null; trace: string[] }
   const triageNew = () =>
     act('triage', async () => {
-      const r = await api<{ model: string; key_set: boolean; claims: Triaged[] }>('/api/agent/triage-new', { n: 3 })
-      const llm = r.claims.filter((c) => c.proposer.startsWith('llm:')).length
+      const r = await api<{ voyage_key_set: boolean; claims: Triaged[] }>('/api/agent/triage-new', { n: 3 })
+      const llm = r.claims.filter((c) => c.proposer.startsWith('graph:')).length
       return {
         tone: 'info',
-        head: `${r.claims.length} new claims triaged: ${llm} by Claude (${r.model}), ${r.claims.length - llm} by the fallback rule`,
+        head: `${r.claims.length} new claims triaged by the LangGraph agent: ${llm} decided with Voyage + Atlas Vector Search, ${r.claims.length - llm} by the fallback rule`,
         lines: [
           ...r.claims.map((c) => `${c.case_id}: ${c.recommendation.toUpperCase()} citing ${c.cited.join(', ')} under ${c.clause.join(', ')} [${c.proposer}]. ${c.rationale}${c.fallback_reason ? ` (fallback: ${c.fallback_reason})` : ''}`),
           'These are proposals only. Each waits in the review queue; a reviewer must read every cited document and the Atlas gate decides.',
@@ -140,7 +140,7 @@ export default function Supervisor() {
           <div className="ctl">
             <div className="what">
               <b>Triage agent</b>
-              <span>Claude proposes on 3 new claims; code checks the citations; rules if Claude is unavailable</span>
+              <span>LangGraph agent on 3 new claims: Atlas Vector Search + Voyage rerank pick the clause and decide; code checks the citations</span>
             </div>
             <button className="btn" onClick={triageNew} disabled={!!busy}>
               {busy === 'triage' ? <Spin /> : <Bot aria-hidden />}

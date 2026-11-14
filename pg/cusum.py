@@ -99,6 +99,45 @@ class SelfCusum:
         return None
 
 
+@dataclass
+class SelfCusumState:
+    """Streaming form of SelfCusum: O(1) time and O(1) space per approval, state fits in one small document.
+
+    push() reproduces SelfCusum.run exactly (property-tested): the same first-alarm index for every input.
+    State: n approvals seen, the warmup log-sum, the CUSUM statistic s, and whether it has alarmed."""
+    sigma: float
+    drop: float = math.log(2)
+    h: float = 4.0
+    warmup: int = 5
+    n: int = 0
+    base_sum: float = 0.0
+    s: float = 0.0
+    alarm_at: int | None = None
+
+    def push(self, dwell_s: float) -> int | None:
+        """Feed one review time (seconds). Returns the 1-based index of the FIRST alarm once it fires, else None."""
+        x = math.log(max(dwell_s, 1e-3))
+        self.n += 1
+        if self.n <= self.warmup:
+            self.base_sum += x
+            return None
+        if self.alarm_at is not None:
+            return self.alarm_at
+        base = self.base_sum / self.warmup
+        k = self.drop / (2 * self.sigma)
+        self.s = max(0.0, self.s + (base - x) / self.sigma - k)
+        if self.s > self.h:
+            self.alarm_at = self.n
+        return self.alarm_at
+
+    def to_doc(self) -> dict:
+        return {"n": self.n, "base_sum": self.base_sum, "s": self.s, "alarm_at": self.alarm_at}
+
+    @classmethod
+    def from_doc(cls, d: dict, sigma: float, drop: float, h: float, warmup: int) -> "SelfCusumState":
+        return cls(sigma, drop, h, warmup, d["n"], d["base_sum"], d["s"], d.get("alarm_at"))
+
+
 def calibrate_self_h(sigma: float, honest_medians_s: Sequence[float], shift_len: int = 50, n_shifts: int = 600,
                      alpha: float = 0.05, delta: float = 0.05, seed: int = 0, drop: float = math.log(2)):
     """Certify h for SelfCusum on honest reviewers of ANY speed (each with their own median)."""

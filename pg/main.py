@@ -5,17 +5,17 @@ Follows the PRD Section 8 contract. Run: uvicorn pg.main:app --port 8080
 from __future__ import annotations
 
 import json
-import secrets
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from pg import agent, config, gate, review, rules, target
+from pg import agent, config, gate, review, rules, target, voice
+from pg.auth import console_only, same
 from pg.config import settings
 from pg.db import get_db
 
@@ -36,14 +36,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ProofGate", lifespan=lifespan)
 app.include_router(target.router)
+app.include_router(voice.router)
 
 
 def clean(x):
     return json.loads(json.dumps(x, default=str))
 
 
-def _same(given: str | None, expected: str) -> bool:
-    return bool(expected) and secrets.compare_digest((given or "").encode(), expected.encode())
+_same = same
+MAX_BULK = 100
+
+
+def _text(v, name: str, max_len: int, allow_empty: bool = False) -> str:
+    """Request fields that reach a Mongo filter must be plain bounded strings: a dict like {"$ne": ""} is an operator."""
+    if not isinstance(v, str) or (not v and not allow_empty) or len(v) > max_len:
+        raise HTTPException(422, f"{name} must be a string of at most {max_len} characters")
+    return v
 
 
 def agent_only(x_service_identity: str | None, x_service_key: str | None):
@@ -51,10 +59,14 @@ def agent_only(x_service_identity: str | None, x_service_key: str | None):
         raise HTTPException(401, "agent service identity required")
 
 
-def console_only(x_console_key: str | None = Header(None)):
-    """Operator console key for sessions and the control plane. Without it: 401, nothing is read or written."""
-    if not _same(x_console_key, settings.console_key):
-        raise HTTPException(401, "console key required")
+@app.exception_handler(review.BadRequest)
+async def br(_, e):
+    return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.exception_handler(gate.PolicyRejected)
+async def pr(_, e):
+    return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.exception_handler(review.NotFound)
@@ -69,7 +81,7 @@ def sessions(body: dict):
 
 
 @app.get("/api/queue")
-def queue(x_tenant_id: str = Header(...), x_session_id: str | None = Header(None), status: str = "pending_review", limit: int = 50):
+def queue(x_tenant_id: str = Header(...), x_session_id: str | None = Header(None), status: str = "pending_review", limit: int = Query(50, ge=1, le=100)):
     db = get_db()
     q = {"tenant_id": x_tenant_id, "status": status, "recommendation": "deny"}
     if x_session_id:
@@ -107,12 +119,23 @@ def close_view(token: str, x_tenant_id: str = Header(...)):
 
 @app.post("/api/approvals", status_code=201)
 def approvals(body: dict, x_tenant_id: str = Header(...), x_session_id: str = Header(...)):
-    return clean(review.approve(x_tenant_id, x_session_id, body["proposal_id"], body.get("attestation_text", ""), body))
+    pid = _text(body.get("proposal_id"), "proposal_id", 100)  # a dict here would be a Mongo operator injection (S10)
+    att = _text(body.get("attestation_text", ""), "attestation_text", 2000, allow_empty=True)
+    aid = body.get("attestation_id")
+    aid = _text(aid, "attestation_id", 100) if aid is not None else None
+    if len(body) > 20:
+        raise HTTPException(422, "too many fields")
+    return clean(review.approve(x_tenant_id, x_session_id, pid, att, body, aid))
 
 
 @app.post("/api/approvals/bulk")
 def approvals_bulk(body: dict, x_tenant_id: str = Header(...), x_session_id: str = Header(...)):
-    return review.approve_bulk(x_tenant_id, x_session_id, body["proposal_ids"], body.get("attestation_text", "Reviewed in batch."))
+    ids = body.get("proposal_ids")
+    if not isinstance(ids, list) or not 1 <= len(ids) <= MAX_BULK:
+        raise HTTPException(422, f"proposal_ids must be a list of 1 to {MAX_BULK} strings")
+    ids = [_text(i, "proposal_ids[]", 100) for i in ids]
+    att = _text(body.get("attestation_text", "Reviewed in batch."), "attestation_text", 2000, allow_empty=True)
+    return review.approve_bulk(x_tenant_id, x_session_id, ids, att)
 
 
 # ---------------- agent ----------------
@@ -188,6 +211,13 @@ def examiner(case_id: str, x_tenant_id: str = Header(...)):
     return clean(rules.examiner(x_tenant_id, case_id))
 
 
+@app.get("/api/verify/chain/{session_id}")
+def verify_chain(session_id: str, x_tenant_id: str = Header(...)):
+    """Examiner check: is the review-event hash chain intact? Returns the first broken seq if not."""
+    bad = rules.verify_session_chain(get_db(), x_tenant_id, session_id, first_bad_seq=True)
+    return {"session_id": session_id, "intact": bad is True, "first_broken_seq": None if bad is True else bad}
+
+
 @app.get("/rules")
 def rules_route(tenant: str):
     return rules.run_rules(tenant)
@@ -203,6 +233,20 @@ def explain(x_tenant_id: str = Header(...), reviewer_id: str = "dr-stamper"):
     ex = plan["executionStats"]
     return clean({"winningPlan": plan["queryPlanner"]["winningPlan"], "keysExamined": ex["totalKeysExamined"],
                   "docsExamined": ex["totalDocsExamined"], "nReturned": ex["nReturned"]})
+
+
+@app.get("/api/ops")
+def ops(x_tenant_id: str = Header(...), minutes: int = Query(15, ge=1, le=1440)):
+    """Ops panel: gate latency percentiles, retries and detector lag from the Atlas time-series collection.
+    One $group over the (ts, meta) bucketed index: O(points in window)."""
+    db = get_db()
+    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    rows = list(db.telemetry.aggregate([
+        {"$match": {"ts": {"$gte": since}, "meta.tenant_id": x_tenant_id}},
+        {"$group": {"_id": "$meta.kind", "n": {"$sum": 1}, "avg": {"$avg": "$value"}, "max": {"$max": "$value"},
+                    "p": {"$percentile": {"input": "$value", "p": [0.5, 0.95, 0.99], "method": "approximate"}}}}]))
+    return clean({r["_id"]: {"n": r["n"], "avg": round(r["avg"], 2), "max": round(r["max"], 2),
+                             "p50": r["p"][0], "p95": r["p"][1], "p99": r["p"][2]} for r in rows})
 
 
 @app.get("/api/evidence/problem")

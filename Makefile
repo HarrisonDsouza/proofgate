@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: ui demo-case e2e ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
+.PHONY: ui demo-case e2e test-restart ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
 
 install:      ; pip install -r requirements-dev.txt
 smoke:        ; python -m pg.db --smoke
@@ -21,10 +21,11 @@ ui:           ; npm --prefix ui install && npm --prefix ui run dev
 demo-case:    ; $(MAKE) seed && python -m eval.e2e --no-halt
 e2e:          ; $(MAKE) seed && python -m eval.e2e; s=$$?; $(MAKE) seed; exit $$s
 test-conflict:; DEMO_DEBUG_HOOKS=true python -m eval.test_conflict
+test-restart: ; python -m eval.test_detector_restart
 explain:      ; curl -s -H "X-Tenant-Id: payer-acme" localhost:8080/api/explain/window | python -m json.tool
 codes:        ; python -m data.pipeline.codes
-calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live --floor 30
-calibrate-prd:      ; python -m eval.calibrate_detector --prd-model --floor 30
+calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live
+calibrate-prd:      ; python -m eval.calibrate_detector --prd-model
 eval:         ; python -m eval.simulate --seed 1
 eval-heldout: ; python -m eval.simulate --seed 20261114
 baseline:     ; python -m eval.simulate --seed 20261114 --baseline

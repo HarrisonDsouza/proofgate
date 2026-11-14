@@ -140,6 +140,15 @@ def summarise(log, db):
     return out
 
 
+def bson_safe(x):
+    """BSON documents only allow string keys: stringify dict keys recursively (the results hold int keys)."""
+    if isinstance(x, dict):
+        return {str(k): bson_safe(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [bson_safe(v) for v in x]
+    return x
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=1)
@@ -162,7 +171,7 @@ def main():
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     doc = {"kind": "eval", "seed": a.seed, "baseline": a.baseline, "cusum": has_cusum, "prereg_commit": commit,
            "seconds": round(time.time() - t0, 1), "results": res, "createdAt": datetime.now(timezone.utc)}
-    db.eval_runs.insert_one(dict(doc))
+    db.eval_runs.insert_one(bson_safe(doc))
     print(f"commit {commit} seed {a.seed} baseline={a.baseline} cusum={has_cusum}")
     print(f"{'group':<12}{'n':>3}{'att':>6}{'exec':>6}{'refused':>8}{'susp':>6}  reasons")
     for g, r in res["groups"].items():

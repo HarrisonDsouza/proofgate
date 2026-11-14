@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 DECISIONS = Counter("proofgate_decisions_total", "Operate decisions", ["outcome", "requester_type"])
 OPERATE_LATENCY = Histogram(
@@ -28,6 +28,8 @@ OPERATE_LATENCY = Histogram(
 TXN_RETRIES = Counter("proofgate_txn_retries_total", "Transaction retries on write conflict")
 CLOSER_EVENTS = Counter("proofgate_closer_events_total", "Permit change-stream events", ["result"])
 LLM_CALLS = Counter("proofgate_llm_calls_total", "LLM calls", ["purpose", "ok"])
+DETECTOR_LAG = Gauge("proofgate_detector_lag_seconds", "Now minus the approval's created_at when the detector handles it")
+STT_SECONDS = Histogram("proofgate_stt_seconds", "Scribe call latency", buckets=(0.25, 0.5, 1, 2, 4, 8))
 STT_CALLS = Counter("proofgate_stt_calls_total", "Speech-to-text calls", ["ok"])
 
 

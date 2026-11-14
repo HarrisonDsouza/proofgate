@@ -16,3 +16,4 @@ data/raw/
 .hypothesis/
 .pytest_cache/
 .ruff_cache/
+media/

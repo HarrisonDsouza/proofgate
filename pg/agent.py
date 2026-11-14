@@ -12,12 +12,12 @@ import time
 from fastapi import HTTPException
 
 from pg import gate, target
+from pg import observability as obs
 from pg.config import AGENT_ID, OPERATOR_ID
 from pg.db import get_db
-from pg.observability import traceable
 
 
-@traceable("agent.triage")
+@obs.traceable("triage_one")
 def triage(case: dict, clauses: list[dict]) -> dict:
     """Deterministic rule: deny when the prior-auth evidence says 'none on file' and the policy needs one."""
     ev = {e["evidence_id"]: e for e in case["evidence"]}
@@ -32,17 +32,34 @@ def triage(case: dict, clauses: list[dict]) -> dict:
             "cited_clauses": [clause] if clause else []}
 
 
-# Not traced: the result carries grant_id, a single-use bearer token that must not leave our process.
+@obs.traceable("gate_execute")
+def _gate_execute(tenant: str, proposal: dict) -> dict:
+    return gate.execute(tenant, proposal["proposal_id"], proposal["approval_id"], AGENT_ID, OPERATOR_ID)
+
+
+@obs.traceable("target_apply")
+def _target_apply(tenant: str, t: dict, grant_header: str) -> dict:
+    return target.apply(tenant, t["kind"], t["record_id"], t["to_status"], grant_header, AGENT_ID)
+
+
+@obs.traceable("gate_confirm")
+def _gate_confirm(tenant: str, denial_id: str) -> dict:
+    return gate.confirm(tenant, denial_id)
+
+
+@obs.traceable("execute_one")
 def execute_one(tenant: str, proposal: dict) -> dict:
-    res = gate.execute(tenant, proposal["proposal_id"], proposal["approval_id"], AGENT_ID, OPERATOR_ID)
+    obs.annotate_run(tenant_id=tenant, proposal_id=proposal.get("proposal_id"), case_id=proposal.get("case_id"))
+    res = _gate_execute(tenant, proposal)
+    obs.annotate_run(decision=res["decision"])
     if res["decision"] != "ALLOW":
         return res
     t = res["target"]
     try:
-        target.apply(tenant, t["kind"], t["record_id"], t["to_status"], f"Grant {res['grant_id']}", AGENT_ID)
+        _target_apply(tenant, t, f"Grant {res['grant_id']}")
     except HTTPException:
         pass  # the confirm step will mark NOT_EXECUTED
-    return res | {"confirm": gate.confirm(tenant, res["denial_id"])}
+    return res | {"confirm": _gate_confirm(tenant, res["denial_id"])}
 
 
 def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool = False) -> list[dict]:

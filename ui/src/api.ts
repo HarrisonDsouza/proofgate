@@ -84,4 +84,21 @@ export const ruleName = (code: string) => {
   return `${g} ${RULE_NAMES[g] ?? code}`
 }
 
+// Plain-language reason a rule refused (RULE_NAMES names the check; this says what went wrong).
+export const REFUSAL: Record<string, string> = {
+  G1: "this approval doesn't match the proposal",
+  G2: 'the reviewer is suspended, so nothing they approve can run',
+  G3: "the reviewer's license or specialty doesn't qualify",
+  G4: 'not every cited document was opened',
+  G5: 'not enough server-timed review time',
+  G6: 'approving too fast, which looks like bulk stamping',
+  G7: 'the evidence changed after it was viewed',
+  G8: "the reviewer can't be the same person who operates the agent",
+}
+
+export const refusalReason = (code: string) => {
+  const g = code.split('_')[0]
+  return REFUSAL[g] ? `${REFUSAL[g]} (${g})` : code
+}
+
 export const secs = (ms: number | undefined | null) => `${((ms ?? 0) / 1000).toFixed(1)} s`

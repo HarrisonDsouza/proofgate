@@ -25,9 +25,9 @@ The tech lead ticks items off here when the PR that fixes them is merged.
 
 | P | Id | Fix | File | Status |
 |---|---|---|---|---|
-| P1 | S1 / C1 | Delete the HTTP `/compensate` route (the worker calls `compensate()` directly) | `target.py:66-69` | todo |
-| P1 | C3 | `executor_loop(once=True)`: return when paused | `agent.py:49-51` | todo |
-| P1 | C2 | Banner shows "Executed X of N" with N = `bulk.submitted`; demo with `RUN_BACKGROUND=0` | `static/index.html`, `.env` | todo |
+| P1 | S1 / C1 | Delete the HTTP `/compensate` route (the worker calls `compensate()` directly) | `target.py:66-69` | done: PR #6 |
+| P1 | C3 | `executor_loop(once=True)`: return when paused | `agent.py:49-51` | done: PR #6 |
+| P1 | C2 | Banner shows "Executed X of N" with N = `bulk.submitted`; demo with `RUN_BACKGROUND=0` | `static/index.html`, `.env` | done: PR #6 (banner; choose RUN_BACKGROUND on the day) |
 | P2 | — | `make bypass` also curls `/target/.../apply` (and compensate is gone) over HTTP | `eval/bypass.py` | todo |
 | P2 | — | `make e2e`: the honest path end to end, then suspend, compensate and check R6. Run it before every dry run. | `eval/`, `Makefile` | todo |
 | P2 | — | Missing `make burst-forged` (demo.md uses it); save `make test-conflict > docs/test-conflict.txt` | `Makefile` | todo |
@@ -39,9 +39,9 @@ The tech lead ticks items off here when the PR that fixes them is merged.
 
 | P | Id | Fix | Status |
 |---|---|---|---|
-| P1 | S6 / S2 / S5 | One `SUPERVISOR_KEY` header on `/api/policies`, `/api/suspensions`, `/api/agent/pause`, `/api/agent/run-once`; `DEMO_REVIEWER_KEY` on `/api/sessions` | todo |
-| P1 | S7 | Refuse to start if `AGENT_SERVICE_KEY` is the default or under 24 characters; use `secrets.compare_digest` | todo |
-| P1 | S8 | Remove the `X-Debug-Pause-Ms` header (`test_conflict` calls Python directly); demo with `DEMO_DEBUG_HOOKS=false` | todo |
+| P1 | S6 / S2 / S5 | One `SUPERVISOR_KEY` header on `/api/policies`, `/api/suspensions`, `/api/agent/pause`, `/api/agent/run-once`; `DEMO_REVIEWER_KEY` on `/api/sessions` | done: PR #6, one `CONSOLE_KEY` (`X-Console-Key`) on sessions + all control routes |
+| P1 | S7 | Refuse to start if `AGENT_SERVICE_KEY` is the default or under 24 characters; use `secrets.compare_digest` | done: PR #6 |
+| P1 | S8 | Remove the `X-Debug-Pause-Ms` header (`test_conflict` calls Python directly); demo with `DEMO_DEBUG_HOOKS=false` | done: PR #6 |
 | P2 | S10 | Pydantic models (`str`, `max_length`, bounded `list[str]`) instead of `body: dict` | todo |
 | P2 | S11 | Cap `limit` and bulk at 100; lock `run-once` | todo |
 | P2 | — | Unsuspend or reseed path for the demo seat | todo |

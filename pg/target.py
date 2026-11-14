@@ -63,10 +63,8 @@ def apply_route(kind: str, record_id: str, body: dict, x_tenant_id: str = Header
     return apply(x_tenant_id, kind, record_id, body.get("to_status", ""), authorization, x_service_identity)
 
 
-@router.post("/{kind}/{record_id}/compensate")
-def compensate_route(kind: str, record_id: str, body: dict, x_tenant_id: str = Header(...),
-                     x_compensation_for: str = Header(...), x_service_identity: str = Header("compensation-worker")):
-    return compensate(x_tenant_id, kind, record_id, body.get("to_status", "OPEN"), x_compensation_for, x_service_identity)
+# No HTTP compensate route: only the compensation worker (pg/detector.py) reopens records, by calling compensate()
+# in-process from a stored compensation document. An open route let any caller set any status without a grant.
 
 
 @router.get("/{kind}/{record_id}")

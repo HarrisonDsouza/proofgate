@@ -31,8 +31,7 @@ class VersionMoved(PyMongoError):
     retries those (belt and braces next to the server's own write-conflict detection)."""
 
     def __init__(self):
-        super().__init__("reviewer_state version moved")
-        self._add_error_label("TransientTransactionError")
+        super().__init__("reviewer_state version moved", error_labels=["TransientTransactionError"])
 
 
 def _id(prefix: str) -> str:

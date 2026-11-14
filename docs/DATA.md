@@ -70,3 +70,14 @@ deliberately NOT listed here; do not quote them.
 Measured on the Atlas M10 from a laptop on 2026-11-14 (own commands, real database, not the simulator): a gate call has a median of 786 ms (was 1537 ms before the single-aggregation read path), and approving 50 proposals takes 1.9 s as one transaction (a loop of single approvals is about 1.2 s each, so about 61 s for 50). Quote latency only from a fresh run on the demo network.
 
 The Atlas run of the first four commands is the team's, from the PR review, and is the one to cite.
+
+## 7. Detector settings for the demo tenant (for Harry's `seed/generate.py`; SYNTHETIC calibration, label it so)
+The seeded `payer-acme` policy has no `detector` block, so the live detector cannot catch a drifting reviewer. To enable it,
+add this to the policy document (values from `make calibrate-prd`, which fits the PRD's two synthetic honest models, not
+volunteer sessions; real-time demo, so `time_scale` is 1):
+
+```python
+"detector": {"time_scale": 1, "cusum": {"mode": "self", "sigma": 0.4, "h": 5.75, "drop": 0.6931471805599453, "warmup": 5}}
+```
+The drifter needs at least 6 approvals (5 to learn its own baseline), so a live beat needs a reviewer who reviews normally
+for a while and then speeds up. Floor-clustering (`FLOOR_CLUSTERING` flag) needs no setting; it is on by default.

@@ -243,3 +243,33 @@ def test_detector_survives_an_unexpected_exception_and_keeps_processing():
         detector.handle = real
         stop.set()
         th.join(timeout=5)
+
+
+def test_one_reviewer_cannot_read_in_two_sessions_at_once():
+    """S4: opening a document in a second session closes the first session's token, so dwell cannot be earned in parallel."""
+    from pg import review
+    from pg.db import get_db
+    db = get_db()
+    a = review.open_session(T, "dr-demo")["session_id"]
+    b = review.open_session(T, "dr-demo")["session_id"]
+    pr = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
+    ev = [e["evidence_id"] for e in db.cases.find_one({"tenant_id": T, "case_id": pr["case_id"]})["evidence"]]
+    tok_a = review.fetch_evidence(T, a, pr["case_id"], ev[0])["view_token"]
+    tok_b = review.fetch_evidence(T, b, pr["case_id"], ev[1])["view_token"]
+    assert db.view_tokens.find_one({"token": tok_a})["closed_at"] is not None       # session A lost focus
+    assert db.view_tokens.find_one({"token": tok_b})["closed_at"] is None
+    assert review.heartbeat(T, tok_a, True, 100)["credited_ms"] == 0                 # and earns nothing from now on
+    assert db.view_tokens.count_documents({"tenant_id": T, "reviewer_id": "dr-demo", "closed_at": None}) == 1
+
+
+def test_parallel_opens_across_sessions_leave_one_open_token_for_the_reviewer():
+    from pg import review
+    from pg.db import get_db
+    db = get_db()
+    sessions = [review.open_session(T, "dr-demo")["session_id"] for _ in range(4)]
+    pr = db.proposals.find_one({"tenant_id": T, "status": "pending_review"})
+    evs = [e["evidence_id"] for e in db.cases.find_one({"tenant_id": T, "case_id": pr["case_id"]})["evidence"]]
+    ths = [threading.Thread(target=review.fetch_evidence, args=(T, s, pr["case_id"], evs[i % len(evs)])) for i, s in enumerate(sessions)]
+    [t.start() for t in ths]
+    [t.join() for t in ths]
+    assert db.view_tokens.count_documents({"tenant_id": T, "reviewer_id": "dr-demo", "closed_at": None}) == 1

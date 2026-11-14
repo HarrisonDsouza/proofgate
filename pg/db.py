@@ -50,7 +50,7 @@ VALIDATORS = {
     "suspensions": {"bsonType": "object", "required": ["tenant_id", "suspension_id", "reviewer_id", "active", "source", "rule",
                                                        "policy_id", "policy_version", "ts"]},
     "review_events": {"bsonType": "object", "required": ["tenant_id", "session_id", "seq", "reviewer_id", "case_id", "type", "ts", "credited_ms"],
-                      "properties": {"type": {"enum": ["open", "heartbeat", "close", "approve"]}}},
+                      "properties": {"type": {"enum": ["open", "heartbeat", "close", "approve", "attest"]}}},
     "reviewers": {"bsonType": "object", "required": ["tenant_id", "reviewer_id", "license_no", "specialty", "license_expires_at"]},
     "gate_decisions": {"bsonType": "object", "required": ["tenant_id", "decision_id", "case_id", "decision", "checks", "txn_attempts", "ts"],
                        "properties": {"decision": {"enum": ["ALLOW", "REFUSE"]}}},
@@ -69,7 +69,7 @@ VALIDATORS = {
                                     "created_at": {"bsonType": "date"}}},
 }
 PLAIN = ["cases", "target_records", "target_log", "policy_clauses", "reviewer_sessions", "view_tokens",
-         "reviewer_state", "chain_heads", "detector_state", "agent_control", "eval_runs", "telemetry_points"]
+         "reviewer_state", "chain_heads", "detector_state", "agent_control", "eval_runs"]
 
 INDEXES = {
     "cases": [([("tenant_id", A), ("case_id", A)], {"unique": True})],
@@ -98,7 +98,9 @@ INDEXES = {
                                                             "name": "one_active_suspension"})],
     "compensations": [([("denial_id", A)], {"unique": True}), ([("status", A), ("next_attempt_at", A)], {})],
     "attestations": [([("tenant_id", A), ("attestation_id", A)], {"unique": True}),
-                     ([("tenant_id", A), ("reviewer_id", A), ("created_at", A)], {}), ([("tenant_id", A), ("case_id", A)], {})],
+                     ([("tenant_id", A), ("reviewer_id", A), ("created_at", A)], {}), ([("tenant_id", A), ("case_id", A)], {}),
+                     ([("tenant_id", A), ("audio_sha256", A)], {"unique": True, "partialFilterExpression": {"audio_sha256": {"$type": "string"}},
+                                                                "name": "one_use_per_recording"})],
     "audit": [([("tenant_id", A), ("case_id", A), ("ts", A)], {}), ([("tenant_id", A), ("reviewer_id", A), ("ts", A)], {})],
 }
 
@@ -127,6 +129,9 @@ def setup(db=None) -> None:
             db.command("collMod", name, **opts)
         else:
             db.create_collection(name, **opts)
+    if "telemetry" not in have:
+        db.create_collection("telemetry", timeseries={"timeField": "ts", "metaField": "meta", "granularity": "seconds"},
+                             expireAfterSeconds=86400)
     for name in PLAIN:
         if name not in have:
             try:

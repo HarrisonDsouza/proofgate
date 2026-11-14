@@ -59,8 +59,24 @@ def check_reviewer(db, tenant: str, reviewer_id: str, policy: dict) -> tuple[str
     return None
 
 
+def flag_attestation(db, ap: dict) -> None:
+    """Voice evidence is flagged for the examiner, NEVER used to suspend (no calibration data; STT outages must not suspend)."""
+    if not ap.get("attestation_id"):
+        return
+    a = db.attestations.find_one({"tenant_id": ap["tenant_id"], "attestation_id": ap["attestation_id"]})
+    if not a:
+        return
+    sc = a["score"]
+    flags = [f for f, hit in (("BOILERPLATE", sc["boilerplate"] >= 0.8), ("UNVIEWED_EVIDENCE_NAMED", bool(sc.get("unviewed_hits"))),
+                              ("PACE_IMPLAUSIBLE", sc["pace"].get("plausible") is False)) if hit]
+    if flags:
+        db.attestations.update_one({"_id": a["_id"]}, {"$set": {"flags": flags}})
+        obs.CLOSER_EVENTS.labels("voice_flag").inc()
+
+
 def handle(db, change: dict) -> str | None:
     ap = change["fullDocument"]
+    flag_attestation(db, ap)
     tenant, rid = ap["tenant_id"], ap["reviewer_id"]
     if db.suspensions.find_one({"tenant_id": tenant, "reviewer_id": rid, "active": True}):
         return None
@@ -88,6 +104,11 @@ def run(stop: threading.Event | None = None) -> None:
                 time.sleep(0.05)
                 continue
             handle(db, ch)
+            created = (ch.get("fullDocument") or {}).get("created_at")
+            if created:
+                lag = (now() - created).total_seconds()
+                obs.DETECTOR_LAG.set(lag)
+                obs.record_telemetry(db, "detector_lag_s", lag)
             db.detector_state.update_one({"_id": STATE_ID}, {"$set": {"resume_token": cs.resume_token, "last_event_at": now()},
                                                              "$inc": {"events_processed": 1}}, upsert=True)
 

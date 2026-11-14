@@ -66,6 +66,21 @@ def specificity(transcript: str, case: dict, corpus_df: dict[str, int] | None = 
     return {"specificity": round(score, 3), "matched": top, "n_terms": len(terms)}
 
 
+def unviewed_hits(transcript: str, case: dict, opened_ids: set[str]) -> list[str]:
+    """Distinctive terms the reviewer SAID that occur only in evidence the server never saw them open.
+
+    Speech joined with the server-timed view record: saying "PA-77213" when the only item containing it was never
+    opened contradicts the timeline. Terms also present in opened evidence, codes or the summary do not count."""
+    known = set(tokens(case.get("summary", "")))
+    for c in case.get("codes", {}).get("icd10", []) + case.get("codes", {}).get("hcpcs", []):
+        known.add(c.lower())
+    unopened: set[str] = set()
+    for e in case.get("evidence", []):
+        bag = set(tokens(e.get("label", ""))) | set(tokens(e.get("content", "")))
+        (known if e["evidence_id"] in opened_ids else unopened).update(bag)
+    return sorted((unopened - known) & set(tokens(transcript)))
+
+
 def jaccard(a: str, b: str) -> float:
     sa, sb = set(tokens(a)), set(tokens(b))
     return len(sa & sb) / len(sa | sb) if sa | sb else 0.0
@@ -85,10 +100,13 @@ def pace(transcript: str, audio_seconds: float | None) -> dict:
 
 
 def score(transcript: str, case: dict, previous: list[str], audio_seconds: float | None,
-          corpus_df: dict[str, int] | None = None, n_docs: int = 1, cited_ids: set[str] | None = None) -> dict:
+          corpus_df: dict[str, int] | None = None, n_docs: int = 1, cited_ids: set[str] | None = None,
+          opened_ids: set[str] | None = None) -> dict:
     s = specificity(transcript, case, corpus_df, n_docs, cited_ids)
+    s["unviewed_hits"] = unviewed_hits(transcript, case, opened_ids) if opened_ids is not None else []
     b = boilerplate(transcript, previous)
     p = pace(transcript, audio_seconds)
     # one number the examiner page shows; the parts stay stored so nobody has to trust the blend
-    blend = round(max(0.0, s["specificity"] * (1 - b) * (0.5 if p["plausible"] is False else 1.0)), 3)
+    blend = round(max(0.0, s["specificity"] * (1 - b) * (0.5 if p["plausible"] is False else 1.0)
+                      * (0.5 if s["unviewed_hits"] else 1.0)), 3)
     return {**s, "boilerplate": b, "pace": p, "attestation_score": blend}

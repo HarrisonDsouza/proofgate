@@ -174,6 +174,8 @@ def execute(tenant: str, proposal_id: str, approval_id: str, agent_id: str, oper
     obs.OPERATE_LATENCY.observe(tm["ms"] / 1000)
     if attempts["n"] > 1:
         obs.TXN_RETRIES.inc(attempts["n"] - 1)
+    obs.record_telemetry(db, "gate_latency_ms", tm["ms"], decision=out["decision"], attempts=attempts["n"],
+                         gate_decision_id=out["gate_decision_id"])
     obs.log_event("gate", decision=out["decision"], proposal=proposal_id, attempts=attempts["n"], ms=round(tm["ms"], 1),
                   gate_decision_id=out["gate_decision_id"])
     return out

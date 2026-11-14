@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -42,6 +42,11 @@ def clean(x):
 def agent_only(x_service_identity: str | None, x_service_key: str | None):
     if x_service_identity != "triage-agent-v1" or x_service_key != settings.agent_service_key:
         raise HTTPException(401, "agent service identity required")
+
+
+@app.exception_handler(review.BadRequest)
+async def br(_, e):
+    return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.exception_handler(review.NotFound)
@@ -198,6 +203,34 @@ def explain(x_tenant_id: str = Header(...), reviewer_id: str = "dr-stamper"):
     ex = plan["executionStats"]
     return clean({"winningPlan": plan["queryPlanner"]["winningPlan"], "keysExamined": ex["totalKeysExamined"],
                   "docsExamined": ex["totalDocsExamined"], "nReturned": ex["nReturned"]})
+
+
+@app.get("/api/ops")
+def ops(x_tenant_id: str = Header(...), minutes: int = 15):
+    """Ops panel: gate latency percentiles, retries and detector lag from the Atlas time-series collection.
+    One $group over the (ts, meta) bucketed index: O(points in window)."""
+    db = get_db()
+    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    rows = list(db.telemetry.aggregate([
+        {"$match": {"ts": {"$gte": since}}},
+        {"$group": {"_id": "$meta.kind", "n": {"$sum": 1}, "avg": {"$avg": "$value"}, "max": {"$max": "$value"},
+                    "p": {"$percentile": {"input": "$value", "p": [0.5, 0.95, 0.99], "method": "approximate"}}}}]))
+    return clean({r["_id"]: {"n": r["n"], "avg": round(r["avg"], 2), "max": round(r["max"], 2),
+                             "p50": r["p"][0], "p95": r["p"][1], "p99": r["p"][2]} for r in rows})
+
+
+@app.get("/api/ops")
+def ops(x_tenant_id: str = Header(...), minutes: int = 15):
+    """Ops panel: gate latency percentiles, retries and detector lag from the Atlas time-series collection.
+    One $group over the time window: O(points in window)."""
+    db = get_db()
+    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    rows = list(db.telemetry.aggregate([
+        {"$match": {"ts": {"$gte": since}}},
+        {"$group": {"_id": "$meta.kind", "n": {"$sum": 1}, "avg": {"$avg": "$value"}, "max": {"$max": "$value"},
+                    "p": {"$percentile": {"input": "$value", "p": [0.5, 0.95, 0.99], "method": "approximate"}}}}]))
+    return clean({r["_id"]: {"n": r["n"], "avg": round(r["avg"], 2), "max": round(r["max"], 2),
+                             "p50": r["p"][0], "p95": r["p"][1], "p99": r["p"][2]} for r in rows})
 
 
 @app.get("/api/evidence/problem")

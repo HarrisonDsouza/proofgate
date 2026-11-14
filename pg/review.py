@@ -18,6 +18,10 @@ class NotFound(Exception):
     pass
 
 
+class BadRequest(Exception):
+    pass
+
+
 def _rid(prefix: str) -> str:
     return f"{prefix}-{secrets.token_hex(4)}"
 
@@ -25,12 +29,12 @@ def _rid(prefix: str) -> str:
 def chain_body(ev: dict) -> str:
     """Canonical text that is hashed. Includes ts (ms), so event times cannot be edited without detection."""
     ts = ev["ts"].astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
-    return json.dumps({**{k: ev.get(k) for k in ("session_id", "seq", "case_id", "evidence_id", "type", "credited_ms")}, "ts": ts},
+    return json.dumps({**{k: ev.get(k) for k in ("session_id", "seq", "case_id", "evidence_id", "type", "credited_ms", "audio_sha256")}, "ts": ts},
                       sort_keys=True)
 
 
 def _event(db, tenant: str, session_id: str, reviewer_id: str, case_id: str, typ: str, credited_ms: int = 0,
-           evidence_id: str | None = None, s=None) -> None:
+           evidence_id: str | None = None, s=None, audio_sha256: str | None = None) -> None:
     """Append a review_event, hash-chained per session (S3).
 
     Atomic: the read of chain_head, the insert and the head update commit together, so two concurrent events on
@@ -41,7 +45,7 @@ def _event(db, tenant: str, session_id: str, reviewer_id: str, case_id: str, typ
         prev = sess.get("chain_head", "0" * 64)
         t = now()
         ev = {"tenant_id": tenant, "session_id": session_id, "seq": sess["seq"], "reviewer_id": reviewer_id,
-              "case_id": case_id, "evidence_id": evidence_id, "type": typ, "credited_ms": int(credited_ms),
+              "case_id": case_id, "evidence_id": evidence_id, "type": typ, "credited_ms": int(credited_ms), "audio_sha256": audio_sha256,
               "ts": t.replace(microsecond=t.microsecond // 1000 * 1000)}  # BSON dates are ms: hash what is stored
         ev["prev_hash"] = prev
         ev["hash"] = hashlib.sha256((prev + chain_body(ev)).encode()).hexdigest()
@@ -148,8 +152,9 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
     if attestation_id:  # voice is evidence: copy the transcript, never change the gate's inputs
         att = db.attestations.find_one({"tenant_id": tenant, "attestation_id": attestation_id, "session_id": session_id,
                                         "case_id": prop["case_id"]})
-        if att:
-            attestation_text = att["transcript"]
+        if not att:  # wrong case/session/tenant: one good recording cannot be reused across cases
+            raise BadRequest("attestation does not belong to this session and case")
+        attestation_text = att["transcript"]
     ap = {"tenant_id": tenant, "approval_id": _rid("AP"), "case_id": prop["case_id"], "proposal_id": proposal_id,
           "reviewer_id": sess["reviewer_id"], "session_id": session_id,
           "credential_snapshot": {k: rv[k] for k in ("license_no", "specialty", "license_expires_at")},

@@ -29,3 +29,13 @@ def test_pace_implausible_halves_score():
 def test_score_never_negative_and_bounded():
     s = score("", CASE, ["x"], None)
     assert 0.0 <= s["attestation_score"] <= 1.0
+
+
+def test_unviewed_evidence_contradiction_detected():
+    from pg.attest_score import unviewed_hits
+    case = {"summary": "knee", "codes": {"icd10": ["M17.11"], "hcpcs": []},
+            "evidence": [{"evidence_id": "E1", "label": "MRI", "content": "cartilage loss"},
+                         {"evidence_id": "E2", "label": "PA letter", "content": "authorization PA-77213 expired"}]}
+    assert unviewed_hits("mri cartilage loss and PA-77213 expired", case, {"E1"}) == ["expired", "pa-77213"]
+    assert unviewed_hits("mri cartilage loss", case, {"E1"}) == []
+    assert unviewed_hits("PA-77213", case, {"E1", "E2"}) == []

@@ -16,8 +16,9 @@ import time
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import Response
+from pymongo.errors import DuplicateKeyError
 
-from pg import attest_score
+from pg import attest_score, review
 from pg import observability as obs
 from pg.config import settings
 from pg.db import get_db, now
@@ -56,6 +57,7 @@ def transcribe(audio: bytes, content_type: str, http: httpx.Client | None = None
             obs.STT_CALLS.labels("false").inc()
             continue
         ms = (time.perf_counter() - t0) * 1000
+        obs.STT_SECONDS.observe(ms / 1000)
         if r.status_code == 200:
             j = r.json()
             words = j.get("words") or []
@@ -109,12 +111,18 @@ def record_attestation(db, tenant: str, session_id: str, case_id: str, transcrip
     prev = [a["transcript"] for a in db.attestations.find({"tenant_id": tenant, "reviewer_id": sess["reviewer_id"]},
                                                           {"transcript": 1}).sort("created_at", -1).limit(10)]
     df, n = _corpus(db, tenant)
-    sc = attest_score.score(transcript, case, prev, audio_seconds, df, max(n, 1))
+    opened = {t["evidence_id"] for t in db.view_tokens.find({"tenant_id": tenant, "session_id": session_id, "case_id": case_id},
+                                                            {"evidence_id": 1})}
+    sc = attest_score.score(transcript, case, prev, audio_seconds, df, max(n, 1), opened_ids=opened)
     doc = {"tenant_id": tenant, "attestation_id": f"AT-{secrets.token_hex(5)}", "session_id": session_id,
            "reviewer_id": sess["reviewer_id"], "case_id": case_id, "transcript": transcript, "source": source,
            "audio_sha256": audio_sha256, "audio_seconds": audio_seconds, "stt_model": stt_model,
            "score": sc, "created_at": now()}
-    db.attestations.insert_one(doc)
+    try:
+        db.attestations.insert_one(doc)
+    except DuplicateKeyError as e:  # same recording replayed: refused by MongoDB's unique index on audio_sha256
+        raise HTTPException(409, "this exact recording was already used as an attestation") from e
+    review._event(db, tenant, session_id, sess["reviewer_id"], case_id, "attest", 0, None, audio_sha256=audio_sha256)
     doc.pop("_id", None)
     return doc
 

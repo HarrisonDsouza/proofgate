@@ -219,15 +219,49 @@ def confirm(tenant: str, denial_id: str) -> dict:
     return {"denial_id": denial_id, "status": status, "readback": {"status": (rec or {}).get("status"), "grant_id": d["grant_id"]}}
 
 
+class PolicyRejected(ValueError):
+    """The requested policy change is not allowed (unknown key, wrong type, or it would loosen a protection)."""
+
+
+# The only keys a supervisor may change through the API, and which direction is TIGHTER. Anything else (including
+# `baseline_only_existence`, which turns every check but G1 off, and `require_specialty_match`) is rejected.
+TUNABLE = {"min_active_dwell_ms": "up", "min_item_active_ms": "up", "rate_window_ms": "up", "compensation_lookback_ms": "up",
+           "rate_max_approvals": "down", "max_proposal_age_ms": "down"}
+MAX_MS = 7 * 24 * 3600 * 1000
+
+
+def validate_policy_change(current: dict, changes: dict) -> dict:
+    """Return the validated subset to merge, or raise PolicyRejected. Tightening only: floors and windows may rise,
+    caps and ages may fall. A policy API that can loosen is a way to switch the gate off with one request."""
+    if not isinstance(changes, dict) or not changes:
+        raise PolicyRejected("rules must be a non-empty object")
+    out = {}
+    for k, v in changes.items():
+        if k not in TUNABLE:
+            raise PolicyRejected(f"{k!r} is not a tunable policy key")
+        if type(v) is not int:  # bool, float, str and None are all refused
+            raise PolicyRejected(f"{k} must be an integer")
+        if not (1 <= v <= MAX_MS):
+            raise PolicyRejected(f"{k} out of range")
+        cur = current.get(k)
+        if cur is not None and ((TUNABLE[k] == "up" and v < cur) or (TUNABLE[k] == "down" and v > cur)):
+            raise PolicyRejected(f"{k}={v} would loosen the policy (current {cur}); only tightening is allowed")
+        out[k] = v
+    return out
+
+
 def new_policy_version(tenant: str, action_type: str, rules: dict, rationale: str, created_by: str) -> dict:
-    """Supersede the active version and insert v+1 in one transaction (rules merged over the current ones)."""
+    """Supersede the active version and insert v+1 in one transaction (validated rules merged over the current ones)."""
     db = get_db()
+    rationale = str(rationale)[:500]
+    created_by = str(created_by)[:64]
 
     def body(s):
         cur = active_policy(db, tenant, action_type, s)
+        rules_ok = validate_policy_change(cur["rules"], rules)  # raises PolicyRejected: nothing is written
         db.review_policies.update_one({"_id": cur["_id"]}, {"$set": {"status": "superseded"}}, session=s)
         nv = {k: v for k, v in cur.items() if k != "_id"} | {"version": cur["version"] + 1, "status": "active",
-                                                              "rules": cur["rules"] | rules, "rationale": rationale,
+                                                              "rules": cur["rules"] | rules_ok, "rationale": rationale,
                                                               "created_by": created_by, "created_at": now()}
         db.review_policies.insert_one(nv, session=s)
         return {"policy_id": cur["policy_id"], "version": nv["version"], "status": "active", "superseded_version": cur["version"]}

@@ -146,3 +146,18 @@ def test_approve_cannot_reset_a_proposal_that_moved_on_mid_transaction():
         review._rid = real
     assert db.proposals.find_one({"_id": p["_id"]})["status"] == "authorized"
     assert db.approvals.count_documents({"tenant_id": T, "proposal_id": p["proposal_id"]}) == n_before
+
+
+def test_policy_api_rejects_loosening_and_writes_nothing():
+    from pg import gate
+    from pg.db import get_db
+    db = get_db()
+    v0 = gate.active_policy(db, T, "claim_denial")["version"]
+    with pytest.raises(gate.PolicyRejected):
+        gate.new_policy_version(T, "claim_denial", {"baseline_only_existence": True}, "off", "attacker")
+    with pytest.raises(gate.PolicyRejected):
+        gate.new_policy_version(T, "claim_denial", {"min_active_dwell_ms": 1}, "loosen", "attacker")
+    assert gate.active_policy(db, T, "claim_denial")["version"] == v0
+    assert db.review_policies.count_documents({"tenant_id": T, "status": "active"}) == 1
+    out = gate.new_policy_version(T, "claim_denial", {"min_active_dwell_ms": 60000}, "tighten", "supervisor")
+    assert out["version"] == v0 + 1

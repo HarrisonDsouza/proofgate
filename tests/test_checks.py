@@ -89,3 +89,24 @@ def test_credited_time_never_exceeds_wall_clock(beats):
         total += gap
         t = nxt
     assert credited <= total * 1000 + 1
+
+
+def test_policy_validator_allows_only_tightening_of_known_int_keys():
+    import pytest
+
+    from pg.gate import PolicyRejected, validate_policy_change
+    cur = {"min_active_dwell_ms": 30000, "rate_max_approvals": 10, "max_proposal_age_ms": 86400000}
+    assert validate_policy_change(cur, {"min_active_dwell_ms": 60000, "rate_max_approvals": 5}) == {"min_active_dwell_ms": 60000, "rate_max_approvals": 5}
+    for bad in ({"min_active_dwell_ms": 1000},                 # loosens a floor
+                {"rate_max_approvals": 500},                    # loosens a cap
+                {"max_proposal_age_ms": 10 ** 12},              # loosens an age and exceeds the range
+                {"baseline_only_existence": True},              # switches the gate off
+                {"require_specialty_match": False},
+                {"median_n": 1},
+                {"min_active_dwell_ms": "60000"},               # wrong type
+                {"min_active_dwell_ms": 60000.5},
+                {"min_active_dwell_ms": True},                  # bool is not an int here
+                {"min_active_dwell_ms": 0},
+                {}, [], None):
+        with pytest.raises(PolicyRejected):
+            validate_policy_change(cur, bad)

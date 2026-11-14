@@ -56,6 +56,11 @@ async def br(_, e):
     return JSONResponse({"error": str(e)}, status_code=400)
 
 
+@app.exception_handler(gate.PolicyRejected)
+async def pr(_, e):
+    return JSONResponse({"error": str(e)}, status_code=400)
+
+
 @app.exception_handler(review.NotFound)
 async def nf(_, e):
     return JSONResponse({"error": str(e)}, status_code=404)

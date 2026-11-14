@@ -1,0 +1,11 @@
+An AI agent can propose denying an insurance claim. ProofGate makes sure that denial cannot run without proof that a qualified human really reviewed that case. Everything you see uses synthetic data.
+
+Here, a reviewer clicks approve on a whole batch at once. The gate transaction in MongoDB Atlas checks the proof, and the forged burst executes 0 of 50. The reviewer is suspended mid-run.
+
+Now an honest review. The reviewer opens every piece of evidence the agent cited, and the server, not the browser, times it. The gate issues a single-use grant, the denial executes, and we read the claims system back to prove it.
+
+Try to bypass the gate and call the claims system directly. There is no grant, so the bypass gets 403.
+
+An examiner can rebuild any case: what the agent cited, what the reviewer opened, every rule that was checked, and the grant. Rules R1 to R8 pass.
+
+ProofGate. No proof of review, no denial.

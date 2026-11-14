@@ -97,7 +97,9 @@ def examiner(tenant: str, case_id: str) -> dict:
     comp = db.compensations.find_one({"denial_id": denial["denial_id"]}, {"_id": 0}) if denial else None
     recomputed = sum(e["credited_ms"] for e in db.review_events.find(
         {"tenant_id": tenant, "session_id": (approval or {}).get("session_id"), "case_id": case_id, "type": "heartbeat"})) if approval else 0
-    return {"case": case, "proposal": prop, "views": views, "approval": approval,
+    att = db.attestations.find_one({"tenant_id": tenant, "attestation_id": (approval or {}).get("attestation_id")}, {"_id": 0}) \
+        if (approval or {}).get("attestation_id") else None
+    return {"case": case, "proposal": prop, "views": views, "approval": approval, "attestation": att,
             "gate_decisions": list(db.gate_decisions.find(q, {"_id": 0}).sort("ts", 1)),
             "denial": denial, "grant": grant, "target_log": list(db.target_log.find({"tenant_id": tenant, "record_id": case_id}, {"_id": 0}).sort("ts", 1)),
             "suspension": susp, "compensation": comp,

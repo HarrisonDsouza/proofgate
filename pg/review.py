@@ -114,7 +114,8 @@ def _views_for(db, tenant: str, session_id: str, case_id: str) -> list[dict]:
     return list(per.values())
 
 
-def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: str, client_extra: dict | None = None) -> dict:
+def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: str, client_extra: dict | None = None,
+            attestation_id: str | None = None) -> dict:
     """Server computes views and dwell. Always stores the approval (it is evidence); the gate judges it."""
     db = get_db()
     sess = _session(db, tenant, session_id)
@@ -125,14 +126,23 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
     pol = db.review_policies.find_one({"tenant_id": tenant, "action_type": prop["action_type"], "status": "active"})
     _close_open_tokens(db, tenant, session_id)
     views = _views_for(db, tenant, session_id, prop["case_id"])
+    att = None
+    if attestation_id:  # voice is evidence: copy the transcript, never change the gate's inputs
+        att = db.attestations.find_one({"tenant_id": tenant, "attestation_id": attestation_id, "session_id": session_id,
+                                        "case_id": prop["case_id"]})
+        if att:
+            attestation_text = att["transcript"]
     ap = {"tenant_id": tenant, "approval_id": _rid("AP"), "case_id": prop["case_id"], "proposal_id": proposal_id,
           "reviewer_id": sess["reviewer_id"], "session_id": session_id,
           "credential_snapshot": {k: rv[k] for k in ("license_no", "specialty", "license_expires_at")},
           "views": views, "evidence_hashes_viewed": sorted({v["hash"] for v in views}),
           "active_dwell_ms": int(sum(v["active_ms"] for v in views)), "policy_version_at_approval": int(pol["version"]),
           "attestation_text": attestation_text if len(attestation_text or "") >= 10 else (attestation_text or "").ljust(10, "."),
-          "client_supplied_ignored": {k: v for k, v in (client_extra or {}).items() if k not in ("proposal_id", "attestation_text")},
+          "client_supplied_ignored": {k: v for k, v in (client_extra or {}).items() if k not in ("proposal_id", "attestation_text", "attestation_id")},
           "status": "submitted", "created_at": now()}
+    if att:
+        ap["attestation_id"] = att["attestation_id"]
+        ap["attestation_score"] = att["score"]["attestation_score"]
     rs_id = f"{tenant}|{sess['reviewer_id']}"
 
     def body(s):

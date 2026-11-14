@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from pg import agent, gate, review, rules, target
+from pg import agent, gate, review, rules, target, voice
 from pg.config import settings
 from pg.db import get_db
 
@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ProofGate", lifespan=lifespan)
 app.include_router(target.router)
+app.include_router(voice.router)
 
 
 def clean(x):
@@ -93,7 +94,8 @@ def close_view(token: str, x_tenant_id: str = Header(...)):
 
 @app.post("/api/approvals", status_code=201)
 def approvals(body: dict, x_tenant_id: str = Header(...), x_session_id: str = Header(...)):
-    return clean(review.approve(x_tenant_id, x_session_id, body["proposal_id"], body.get("attestation_text", ""), body))
+    return clean(review.approve(x_tenant_id, x_session_id, body["proposal_id"], body.get("attestation_text", ""), body,
+                                    body.get("attestation_id")))
 
 
 @app.post("/api/approvals/bulk")

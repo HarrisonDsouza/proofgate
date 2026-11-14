@@ -61,6 +61,12 @@ VALIDATORS = {
     "proposals": {"bsonType": "object", "required": ["tenant_id", "proposal_id", "case_id", "status"],
                   "properties": {"status": {"enum": ["pending_review", "approved", "authorized", "executed", "needs_review", "reversed"]}}},
     "audit": {"bsonType": "object", "required": ["tenant_id", "ts", "actor", "event"]},
+    "attestations": {"bsonType": "object",
+                     "required": ["tenant_id", "attestation_id", "session_id", "reviewer_id", "case_id", "transcript", "source", "score", "created_at"],
+                     "properties": {"tenant_id": T, "source": {"enum": ["elevenlabs_stt", "typed_fallback"]},
+                                    "audio_sha256": {"bsonType": ["string", "null"]},
+                                    "score": {"bsonType": "object", "required": ["attestation_score", "specificity", "boilerplate"]},
+                                    "created_at": {"bsonType": "date"}}},
 }
 PLAIN = ["cases", "target_records", "target_log", "policy_clauses", "reviewer_sessions", "view_tokens",
          "reviewer_state", "chain_heads", "detector_state", "agent_control", "eval_runs", "telemetry_points"]
@@ -90,6 +96,8 @@ INDEXES = {
                     ([("tenant_id", A), ("reviewer_id", A)], {"unique": True, "partialFilterExpression": {"active": True},
                                                             "name": "one_active_suspension"})],
     "compensations": [([("denial_id", A)], {"unique": True}), ([("status", A), ("next_attempt_at", A)], {})],
+    "attestations": [([("tenant_id", A), ("attestation_id", A)], {"unique": True}),
+                     ([("tenant_id", A), ("reviewer_id", A), ("created_at", A)], {}), ([("tenant_id", A), ("case_id", A)], {})],
     "audit": [([("tenant_id", A), ("case_id", A), ("ts", A)], {}), ([("tenant_id", A), ("reviewer_id", A), ("ts", A)], {})],
 }
 

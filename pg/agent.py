@@ -53,6 +53,10 @@ def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool =
             continue
         batch = list(db.proposals.find({"tenant_id": tenant, "status": "approved", "recommendation": "deny"}).limit(100))
         for p in batch:
+            # Re-read before acting: a suspension mid-batch sends the rest back to review, and asking the gate about
+            # each of those costs a full transaction (~1.9 s on the sandbox) for a certain refusal.
+            if not db.proposals.find_one({"_id": p["_id"], "status": "approved"}, {"_id": 1}):
+                continue
             results.append(execute_one(tenant, p))
         if once:
             return results

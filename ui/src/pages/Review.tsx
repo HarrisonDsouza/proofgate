@@ -101,7 +101,11 @@ export default function Review() {
     const dash = await api<{ suspended_reviewers: string[] }>('/api/dashboard')
     const suspended = dash.suspended_reviewers.includes(session?.reviewer_id ?? '')
     const head = `Executed ${r.executed} of ${n}` + (suspended ? ` · ${session?.reviewer_id} suspended` : '')
-    const lines = [`${title}: refused ${n - r.executed}.`, ...reasons(r.top_reasons)]
+    const sentBack = Math.max(0, n - r.submitted)
+    const lines = [
+      `${title}: the gate refused ${r.submitted - r.executed}` + (sentBack ? `; ${sentBack} sent back to review by the suspension before reaching it.` : '.'),
+      ...reasons(r.top_reasons),
+    ]
     if (suspended) lines.push('Grants revoked, pending approvals sent back to review, executed denials queued to reopen.')
     if (r.executed > 0 && !suspended) lines.push('Denial executed and read back from the claims system.')
     const ok = r.executed > 0 && !suspended

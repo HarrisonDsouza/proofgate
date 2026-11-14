@@ -56,6 +56,8 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - 14:45 First baseline run discarded: its detector thread died on a scratch tenant created by PR #8 tests run at the same time (old detector did not catch LookupError). Re-run after merge.
 - 14:47 PR #8 merged after Atlas checks. Verdict comment on the PR lists follow-ups (gate.confirm 500 on unknown denial, /rules unauthenticated, seed not clearing attestations).
 - 14:55 PR #12 updated with the Ledger + Case File design; Impeccable and Diagram Design skills installed for Harry (files read first). Flow diagram in project-docs/design/.
+- 15:06 Browser test of the new UI with the console key: honest approval of CLM-A-0005 (51.7 s server-credited, 2 of 2 cited) → "Executed 1 of 1", DENIED stamp. "Select all · approve 50" → "Executed 0 of 50 · dr-demo suspended", both executed denials reopened. **Problem: the bulk click took about 5 minutes end to end** (50 sequential approval transactions, then 50 gate calls). Demo data reseeded (`make seed && make demo-case`, ALL PASS).
+- 15:35 Bulk speed-up (Harry approved): approve_bulk writes the 50 approvals, proposal updates, reviewer_state and hash-chained events in one transaction; the executor re-reads status and skips proposals a suspension already sent back. Scratch tenant: 50 approvals 2.1 s (was ~80 s), agent run 5.9 s. Browser: bulk 4.3 s + run-once 16.1 s, "Executed 0 of 50 · suspended". `make test` 80 passed, lint clean.
 
 ## Checkpoints
 

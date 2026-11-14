@@ -13,6 +13,7 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 | #5 | Harry / `harry` | Atlas-tier research, FIXES.md A1-A3, work-log time fixes (docs only) | tech lead | `make ci` PASS | OK | 13:08 |
 | #6 | Harry / `harry` | Security P1: console key on sessions and the control plane, refuse weak agent key, removed HTTP compensate and debug pause, paused run-once fix, bulk banner | tech lead | `make ci` 46 passed; live curl 401/401/405 | OK | 13:12 |
 | #8 | Sukhman / `sukhman` | Gate and detector hardening, streaming CUSUM, kill/restart test, voice layer (+1342) | code review + security retest + Atlas run | Atlas: test-conflict 6/6, test-restart 5/5, bypass 3/3; ci 68/69 (validator enum; fixed by setup) | **merge after fixes** (8 must-fix, see PR comment) | — |
+| #9 | Harry / `harry` | `make e2e` honest path + halt; core-ok logged; tag `core-ok` | tech lead | `make e2e` ALL PASS on Atlas | OK | 14:01 |
 
 ## Events
 

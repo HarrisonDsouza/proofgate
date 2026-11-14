@@ -7,4 +7,6 @@ numpy>=1.26
 scipy>=1.11
 pandas>=2.2
 langsmith>=0.1
-anthropic>=0.40
+langgraph>=1.0
+langgraph-checkpoint-mongodb>=0.5
+voyageai>=0.3

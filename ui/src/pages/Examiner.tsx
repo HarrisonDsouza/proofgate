@@ -3,7 +3,7 @@ import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ruleName, secs } from '../api'
-import { Notice, Title } from '../ui'
+import { Notice, Spin, Title } from '../ui'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Ex = Record<string, any>
@@ -81,12 +81,12 @@ export default function Examiner() {
           Case
           <input value={input} onChange={(e) => setInput(e.target.value)} />
         </label>
-        <button className="btn ink">Rebuild from Atlas</button>
+        <button className="btn ink" disabled={q.isFetching}>{q.isFetching && <Spin />}Rebuild from Atlas</button>
         <span className="subtle" style={{ fontSize: 13.5, paddingBottom: 9 }}>Read from stored documents, not from logs or this browser.</span>
       </form>
 
       {!caseId && <p className="empty">Enter a case to reconstruct its full decision trail.</p>}
-      {q.isLoading && <p className="empty">Reading {caseId} from Atlas…</p>}
+      {q.isLoading && <p className="empty"><Spin /> Reading {caseId} from Atlas…</p>}
       {q.isError && <Notice tone="bad" head={`Could not load ${caseId}`} />}
       {d && !d.case && <Notice tone="bad" head={`No case ${caseId} in this tenant`} />}
       {d?.case && <Verdict d={d} />}

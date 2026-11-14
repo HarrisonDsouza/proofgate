@@ -56,11 +56,11 @@ Neil generates the narration with ElevenLabs text-to-speech. Before recording, c
 | Time | Step | Fallback |
 |---|---|---|
 | 0:00-0:20 | The problem in one breath, plus the buyer (Chief Compliance Officer / General Counsel) | - |
-| 0:20-0:50 | **The judge clicks "approve 50"** → 0 of 50, suspended | Play the fallback video; run `make burst-forged` in the terminal |
+| 0:20-0:50 | **The judge clicks "approve 50"** → 0 of 50, suspended | Play the fallback video; run `make test-conflict` in the terminal (its last lines are the forged burst: 0 of 50) |
 | 0:50-1:10 | `make bypass` → 403; the examiner shows the refusal | Show the `target_log` doc in Atlas Data Explorer |
 | 1:10-1:50 | **The judge reviews as `dr-demo`** for 30 s → executed + read-back. Narrate the server timing during the wait. | Use the pre-approved `dr-prep` case |
 | 1:50-2:15 | Policy floor 30→60 s, next call refused citing the new version (if built) | Screenshot from the dry run |
-| 2:15-2:40 | `make test-conflict` output | Saved `docs/test-conflict.txt` |
+| 2:15-2:40 | `make test-conflict` output | Saved `docs/test-conflict.txt` (run 15:57 today) |
 | 2:40-3:00 | Eval table incl. the forger null result; R1-R8 ✓ | README section |
 
 ## Rehearsal

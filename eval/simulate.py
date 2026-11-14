@@ -135,7 +135,7 @@ def summarise(log, db):
            "median_verified_active_s_per_executed": (statistics.median(
                [x["dwell_ms"] for x in log if x.get("dwell_ms") and (d := denials.get(x["case"])) and d["status"] in ("CONFIRMED", "REVERSED")])
                * SCALE / 1000) if denials else None,
-           "txn_attempts": dict(Counter(g["txn_attempts"] for g in db.gate_decisions.find({"tenant_id": TENANT}))),
+           "txn_attempts": {str(k): v for k, v in Counter(g["txn_attempts"] for g in db.gate_decisions.find({"tenant_id": TENANT})).items()},  # BSON keys must be strings
            "rules": {k: v["pass"] for k, v in run_rules(TENANT).items()}}
     return out
 

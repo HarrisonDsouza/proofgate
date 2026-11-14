@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProofGate · three design directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600;800&family=Instrument+Serif&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #2a2a2a; color: #eee; }
+  .picker { position: sticky; top: 0; z-index: 10; display: flex; gap: 8px; align-items: center; padding: 12px 20px; background: #111; border-bottom: 1px solid #333; }
+  .picker b { margin-right: 12px; font-weight: 600; }
+  .picker button { background: #222; color: #ddd; border: 1px solid #444; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  .picker button.on { background: #fff; color: #111; border-color: #fff; }
+  .frame { width: 1280px; margin: 24px auto; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: none; }
+  .frame.on { display: block; }
+  .note { width: 1280px; margin: 0 auto; color: #bbb; font-size: 14px; padding: 16px 0 0; }
+  .note h2 { color: #fff; margin: 0 0 4px; font-size: 18px; }
+
+  /* ================= A · THE LEDGER ================= */
+  .A { background: #f3efe4; color: #1b1a17; font-family: 'IBM Plex Sans', sans-serif; min-height: 820px; background-image: repeating-linear-gradient(0deg, transparent 0 31px, rgba(27,26,23,.045) 31px 32px); }
+  .A header { display: flex; align-items: baseline; gap: 28px; padding: 26px 48px 18px; border-bottom: 3px double #1b1a17; }
+  .A .mark { font: 800 34px/1 'Fraunces', serif; letter-spacing: -.02em; }
+  .A .mark i { font-style: italic; font-weight: 400; color: #9b2c1c; }
+  .A nav { display: flex; gap: 22px; font: 500 13px 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .08em; }
+  .A nav a { color: #1b1a17; text-decoration: none; padding-bottom: 4px; }
+  .A nav a.on { border-bottom: 2px solid #9b2c1c; }
+  .A .folio { margin-left: auto; font: 12px 'IBM Plex Mono', monospace; color: #6b665a; }
+  .A .tally { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid #1b1a17; }
+  .A .tally div { padding: 18px 48px 16px; border-right: 1px solid rgba(27,26,23,.25); }
+  .A .tally div:last-child { border-right: 0; }
+  .A .tally small { font: 500 11px 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .1em; color: #6b665a; }
+  .A .tally strong { display: block; font: 600 44px/1.05 'Fraunces', serif; font-variant-numeric: tabular-nums; }
+  .A .tally .red { color: #9b2c1c; }
+  .A main { display: grid; grid-template-columns: 380px 1fr; }
+  .A .q { border-right: 1px solid #1b1a17; }
+  .A .q h3, .A .case h3 { font: 500 11px 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .12em; color: #6b665a; margin: 0; padding: 16px 24px 10px 48px; }
+  .A .row { display: grid; grid-template-columns: 110px 1fr 70px; gap: 10px; padding: 11px 24px 11px 48px; border-top: 1px solid rgba(27,26,23,.18); font-size: 13.5px; }
+  .A .row .id { font: 600 12.5px 'IBM Plex Mono', monospace; }
+  .A .row .amt { font: 12.5px 'IBM Plex Mono', monospace; text-align: right; }
+  .A .row.on { background: #1b1a17; color: #f3efe4; }
+  .A .case { padding: 0 48px 32px 40px; position: relative; }
+  .A .case h3 { padding-left: 0; }
+  .A h1 { font: 600 40px/1.1 'Fraunces', serif; margin: 2px 0 6px; letter-spacing: -.01em; }
+  .A .sub { color: #4a463d; max-width: 560px; }
+  .A .stamp { position: absolute; right: 56px; top: 28px; transform: rotate(-8deg); border: 4px solid #9b2c1c; color: #9b2c1c; padding: 6px 16px; font: 800 26px/1 'Fraunces', serif; letter-spacing: .08em; border-radius: 6px; opacity: .88; mix-blend-mode: multiply; }
+  .A .stamp small { display: block; font: 500 10px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-align: center; margin-top: 3px; }
+  .A .ev { margin-top: 22px; border-top: 2px solid #1b1a17; }
+  .A .ev div { display: grid; grid-template-columns: 40px 1fr 160px 70px; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(27,26,23,.2); }
+  .A .ev .n { font: 600 13px 'IBM Plex Mono', monospace; }
+  .A .ev .cite { font: 500 10.5px 'IBM Plex Mono', monospace; color: #9b2c1c; border: 1px solid #9b2c1c; padding: 1px 6px; margin-left: 8px; letter-spacing: .08em; }
+  .A .ticks { height: 10px; background: repeating-linear-gradient(90deg, #1b1a17 0 2px, transparent 2px 8px); opacity: .18; position: relative; }
+  .A .ticks i { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, #1b1a17 0 2px, transparent 2px 8px); opacity: 1; }
+  .A .ev .t { font: 600 13px 'IBM Plex Mono', monospace; text-align: right; }
+  .A .sum { display: flex; align-items: baseline; gap: 14px; margin: 22px 0 18px; }
+  .A .sum strong { font: 600 56px/1 'Fraunces', serif; }
+  .A .sum span { font: 13px 'IBM Plex Mono', monospace; color: #4a463d; }
+  .A .sign { display: flex; gap: 16px; align-items: end; }
+  .A .sign .line { flex: 1; border-bottom: 1px solid #1b1a17; padding: 8px 0; font: italic 400 20px 'Fraunces', serif; color: #6b665a; }
+  .A .btn { font: 600 13px 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .1em; padding: 14px 22px; border: 2px solid #1b1a17; background: #1b1a17; color: #f3efe4; }
+  .A .btn.ghost { background: transparent; color: #9b2c1c; border-color: #9b2c1c; }
+
+  /* ================= B · THE CHECKPOINT ================= */
+  .B { background: #0b0d10; color: #d7dde4; font-family: 'Space Grotesk', sans-serif; min-height: 820px; }
+  .B header { display: flex; align-items: center; gap: 24px; padding: 14px 28px; border-bottom: 1px solid #1d232b; }
+  .B .mark { display: flex; align-items: center; gap: 10px; font: 700 18px 'Space Grotesk', system-ui, sans-serif; letter-spacing: .02em; }
+  .B .gate { width: 22px; height: 22px; border: 2px solid #3ddc84; border-radius: 4px; position: relative; }
+  .B .gate::after { content: ''; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: #3ddc84; transform: translateX(-50%); }
+  .B nav { display: flex; gap: 4px; }
+  .B nav a { font: 500 13px 'JetBrains Mono', monospace; color: #7d8794; padding: 6px 12px; border-radius: 4px; text-decoration: none; }
+  .B nav a.on { color: #0b0d10; background: #d7dde4; }
+  .B .live { margin-left: auto; font: 500 12px 'JetBrains Mono', monospace; color: #3ddc84; display: flex; align-items: center; gap: 8px; }
+  .B .live i { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 0 4px rgba(61,220,132,.15); }
+  .B .wrap { display: grid; grid-template-columns: 1fr 360px; }
+  .B .main { padding: 24px 28px; }
+  .B .counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #1d232b; border: 1px solid #1d232b; margin-bottom: 24px; }
+  .B .counters div { background: #0b0d10; padding: 14px 16px; }
+  .B .counters small { font: 500 11px 'JetBrains Mono', monospace; color: #7d8794; text-transform: uppercase; letter-spacing: .08em; }
+  .B .counters strong { display: block; font: 800 36px/1.1 'JetBrains Mono', monospace; }
+  .B .g { color: #3ddc84; } .B .r { color: #ff5c49; } .B .a { color: #ffb020; }
+  .B .lane { display: grid; grid-template-columns: 1fr 64px 1fr; align-items: center; gap: 0; margin-bottom: 22px; }
+  .B .box { border: 1px solid #1d232b; border-radius: 8px; padding: 16px; background: #10141a; }
+  .B .box h4 { margin: 0 0 6px; font: 500 11px 'JetBrains Mono', monospace; color: #7d8794; letter-spacing: .1em; text-transform: uppercase; }
+  .B .box .big { font: 700 22px 'Space Grotesk', system-ui, sans-serif; }
+  .B .arrow { height: 2px; background: repeating-linear-gradient(90deg, #ff5c49 0 6px, transparent 6px 10px); position: relative; }
+  .B .arrow::after { content: 'LOCKED'; position: absolute; left: 50%; top: -22px; transform: translateX(-50%); font: 700 10px 'JetBrains Mono', monospace; color: #ff5c49; letter-spacing: .12em; }
+  .B .checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 22px; }
+  .B .chk { border: 1px solid #1d232b; border-radius: 6px; padding: 10px 12px; font-size: 13px; background: #10141a; }
+  .B .chk b { display: block; font: 700 12px 'JetBrains Mono', monospace; margin-bottom: 2px; }
+  .B .chk.ok { border-color: rgba(61,220,132,.35); } .B .chk.ok b { color: #3ddc84; }
+  .B .chk.wait { border-color: rgba(255,176,32,.35); } .B .chk.wait b { color: #ffb020; }
+  .B .evrow { display: grid; grid-template-columns: 34px 1fr 200px 64px; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #1d232b; font-size: 14px; }
+  .B .evrow .n { font: 700 12px 'JetBrains Mono', monospace; color: #7d8794; }
+  .B .meter { height: 6px; background: #1d232b; border-radius: 3px; overflow: hidden; }
+  .B .meter i { display: block; height: 100%; background: #3ddc84; }
+  .B .evrow .t { font: 600 13px 'JetBrains Mono', monospace; text-align: right; }
+  .B .act { display: flex; gap: 12px; margin-top: 22px; }
+  .B .btn { font: 700 14px 'Space Grotesk', system-ui, sans-serif; padding: 12px 20px; border-radius: 6px; border: 0; background: #3ddc84; color: #0b0d10; }
+  .B .btn.red { background: transparent; color: #ff5c49; border: 1px solid #ff5c49; }
+  .B aside { border-left: 1px solid #1d232b; padding: 20px; font: 12px/1.7 'JetBrains Mono', monospace; color: #7d8794; }
+  .B aside h4 { margin: 0 0 12px; color: #d7dde4; font: 500 11px 'JetBrains Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
+  .B aside p { margin: 0; padding: 5px 0; border-bottom: 1px dashed #1d232b; }
+  .B aside .ts { color: #4b5562; margin-right: 8px; }
+
+  /* ================= C · THE CASE FILE ================= */
+  .C { background: #e9eef0; color: #12262b; font-family: 'Manrope', sans-serif; min-height: 820px; padding: 28px 40px; }
+  .C header { display: flex; align-items: center; gap: 28px; margin-bottom: 26px; }
+  .C .mark { font: 400 30px 'Instrument Serif', serif; }
+  .C .mark span { display: inline-block; width: 12px; height: 12px; background: #0f6e74; border-radius: 50%; margin-right: 10px; vertical-align: 3px; }
+  .C nav { display: flex; gap: 6px; background: #fff; padding: 4px; border-radius: 999px; }
+  .C nav a { padding: 7px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; color: #4f6469; text-decoration: none; }
+  .C nav a.on { background: #12262b; color: #fff; }
+  .C .who { margin-left: auto; display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; }
+  .C .av { width: 34px; height: 34px; border-radius: 50%; background: #0f6e74; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  .C .grid { display: grid; grid-template-columns: 300px 1fr 260px; gap: 20px; }
+  .C .panel { background: #fff; border-radius: 20px; padding: 20px; }
+  .C .label { font-size: 12px; font-weight: 700; color: #6c8186; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 10px; }
+  .C .qi { padding: 12px 14px; border-radius: 12px; margin-bottom: 6px; }
+  .C .qi b { display: block; font-size: 14px; }
+  .C .qi small { color: #6c8186; font-size: 13px; }
+  .C .qi.on { background: #dff0ef; box-shadow: inset 3px 0 0 #0f6e74; }
+  .C .tab { display: inline-block; background: #12262b; color: #fff; padding: 8px 20px 18px; border-radius: 14px 14px 0 0; font-weight: 700; font-size: 13px; margin-bottom: -12px; }
+  .C .file { background: #fff; border-radius: 0 20px 20px 20px; padding: 26px; position: relative; }
+  .C h1 { font: 400 44px/1.05 'Instrument Serif', serif; margin: 0 0 8px; }
+  .C .chips { display: flex; gap: 8px; margin-bottom: 18px; }
+  .C .chip { font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: #eef3f4; }
+  .C .chip.deny { background: #fde3dc; color: #a3361c; }
+  .C .docs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+  .C .doc { border: 1.5px solid #dbe4e6; border-radius: 14px; padding: 14px; position: relative; }
+  .C .doc.done { border-color: #0f6e74; }
+  .C .doc .ring { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; margin-bottom: 10px; }
+  .C .doc b { display: block; font-size: 14px; }
+  .C .doc small { color: #6c8186; }
+  .C .doc .c { position: absolute; top: 12px; right: 12px; font-size: 11px; font-weight: 800; color: #0f6e74; }
+  .C .bar { height: 14px; background: #eef3f4; border-radius: 999px; overflow: hidden; margin: 8px 0 6px; }
+  .C .bar i { display: block; height: 100%; background: linear-gradient(90deg, #0f6e74, #2bb3a3); border-radius: 999px; }
+  .C .btn { font: 800 15px 'Manrope', system-ui, sans-serif; padding: 14px 22px; border-radius: 14px; border: 0; background: #12262b; color: #fff; }
+  .C .side .big { font: 400 54px/1 'Instrument Serif', serif; }
+  .C .side .stat { padding: 14px 0; border-bottom: 1px solid #eef3f4; }
+  .C .side .stat:last-child { border: 0; }
+  .C .warn { background: #fff4ef; border-radius: 16px; padding: 16px; margin-top: 16px; font-size: 14px; }
+  .C .warn button { margin-top: 10px; width: 100%; background: #fff; border: 1.5px solid #a3361c; color: #a3361c; font: 800 14px 'Manrope', system-ui, sans-serif; padding: 10px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<div class="picker">
+  <b>ProofGate · pick a direction</b><span style="color:#888;font-size:13px;margin-right:12px">Mockups: numbers and cases are placeholders, not results</span>
+  <button class="on" data-f="A">A · The Ledger</button>
+  <button data-f="B">B · The Checkpoint</button>
+  <button data-f="C">C · The Case File</button>
+</div>
+
+<div class="note" id="nA"><h2>A · The Ledger</h2>An auditor's ledger: paper, ruled lines, a serif for figures, and a red-ink "DENIED" stamp that only lands once the gate allows it. The idea is that every decision here is a permanent record. It reads as serious, regulatory and distinctive. It is the furthest from a generic SaaS look.</div>
+<div class="note" id="nB" style="display:none"><h2>B · The Checkpoint</h2>A security checkpoint: dark, live telemetry, a LOCKED line between the agent and the claims system, the eight gate checks lighting up as you meet them, and a transaction log streaming on the right. It sells "the agent cannot get through" most dramatically on a projector.</div>
+<div class="note" id="nC" style="display:none"><h2>C · The Case File</h2>A clinical case file: calm teal, soft panels, a folder tab, and each piece of evidence as a document card with a progress ring. It is the friendliest for the reviewer and the most like a real healthcare product.</div>
+
+<!-- A -->
+<div class="frame A on" id="A">
+  <header>
+    <div class="mark">Proof<i>Gate</i></div>
+    <nav><a class="on">Review</a><a>Supervisor</a><a>Examiner</a></nav>
+    <div class="folio">PAYER-ACME · POLICY v1 · SAT 14 NOV 2026</div>
+  </header>
+  <div class="tally">
+    <div><small>Denials executed</small><strong>1</strong></div>
+    <div><small>Refused by the gate</small><strong class="red">50</strong></div>
+    <div><small>Reopened after suspension</small><strong>0</strong></div>
+    <div><small>Awaiting review</small><strong>122</strong></div>
+  </div>
+  <main>
+    <div class="q">
+      <h3>Queue · dr-demo · cardiology</h3>
+      <div class="row on"><span class="id">CLM-A-0007</span><span>Echo without prior auth</span><span class="amt">$1,840</span></div>
+      <div class="row"><span class="id">CLM-A-0012</span><span>Stress test, duplicate</span><span class="amt">$960</span></div>
+      <div class="row"><span class="id">CLM-A-0015</span><span>Holter outside window</span><span class="amt">$420</span></div>
+      <div class="row"><span class="id">CLM-A-0021</span><span>Cath lab, code mismatch</span><span class="amt">$12,300</span></div>
+      <div class="row"><span class="id">CLM-A-0024</span><span>ECG billed twice</span><span class="amt">$180</span></div>
+      <div class="row"><span class="id">CLM-A-0030</span><span>Ablation, no referral</span><span class="amt">$22,450</span></div>
+    </div>
+    <div class="case">
+      <h3>Case under review</h3>
+      <h1>CLM-A-0007</h1>
+      <div class="sub">The agent proposes to <b>deny</b>: service billed without a prior authorization on file; policy MP-030 requires one.</div>
+      <div class="stamp">DENIED<small>GATE ALLOWED · v1</small></div>
+      <div class="ev">
+        <div><span class="n">E1</span><span>Claim form 837P <span class="cite">CITED</span></span><span class="ticks"><i style="width:100%"></i></span><span class="t">22.4 s</span></div>
+        <div><span class="n">E2</span><span>Member eligibility</span><span class="ticks"><i style="width:0"></i></span><span class="t" style="color:#6b665a">—</span></div>
+        <div><span class="n">E3</span><span>Prior-auth search result <span class="cite">CITED</span></span><span class="ticks"><i style="width:100%"></i></span><span class="t">22.8 s</span></div>
+      </div>
+      <div class="sum"><strong>45.2 s</strong><span>timed by the server · floor 30.0 s · every cited item opened</span></div>
+      <div class="sign"><div class="line">Checked the cited records against the codes and the policy clause.</div><button class="btn">Approve denial</button><button class="btn ghost">Approve 50</button></div>
+    </div>
+  </main>
+</div>
+
+<!-- B -->
+<div class="frame B" id="B">
+  <header>
+    <div class="mark"><span class="gate"></span>PROOFGATE</div>
+    <nav><a class="on">review</a><a>supervisor</a><a>examiner</a></nav>
+    <div class="live"><i></i>ATLAS · change stream live · policy v1</div>
+  </header>
+  <div class="wrap">
+    <div class="main">
+      <div class="counters">
+        <div><small>executed</small><strong class="g">1</strong></div>
+        <div><small>refused</small><strong class="r">50</strong></div>
+        <div><small>reopened</small><strong>0</strong></div>
+        <div><small>pending</small><strong class="a">122</strong></div>
+      </div>
+      <div class="lane">
+        <div class="box"><h4>Agent proposes</h4><div class="big">DENY CLM-A-0007</div><div style="color:#7d8794;font-size:13px">No prior auth on file · MP-030</div></div>
+        <div class="arrow"></div>
+        <div class="box"><h4>Claims system</h4><div class="big" style="color:#ff5c49">No grant</div><div style="color:#7d8794;font-size:13px">Record unchanged · 403 on any call</div></div>
+      </div>
+      <div class="checks">
+        <div class="chk ok"><b>G1 ✓</b>Matches proposal</div>
+        <div class="chk ok"><b>G2 ✓</b>Not suspended</div>
+        <div class="chk ok"><b>G3 ✓</b>Cardiology, licensed</div>
+        <div class="chk wait"><b>G4 2/3</b>Cited items opened</div>
+        <div class="chk wait"><b>G5 18.2/30 s</b>Server-timed dwell</div>
+        <div class="chk ok"><b>G6 ✓</b>Not in bulk</div>
+        <div class="chk ok"><b>G7 ✓</b>Evidence unchanged</div>
+        <div class="chk ok"><b>G8 ✓</b>Separation of duties</div>
+      </div>
+      <div class="evrow"><span class="n">E1</span><span>Claim form 837P</span><span class="meter"><i style="width:100%"></i></span><span class="t g">12.1 s</span></div>
+      <div class="evrow"><span class="n">E3</span><span>Prior-auth search result</span><span class="meter"><i style="width:60%"></i></span><span class="t">6.1 s</span></div>
+      <div class="evrow"><span class="n">E4</span><span>Policy MP-030 clause 4</span><span class="meter"><i style="width:0"></i></span><span class="t" style="color:#4b5562">not opened</span></div>
+      <div class="act"><button class="btn">Approve denial</button><button class="btn red">Select all · approve 50</button></div>
+    </div>
+    <aside>
+      <h4>Atlas transaction log</h4>
+      <p><span class="ts">14:07:20</span><span class="g">ALLOW</span> CLM-A-0003 · 8/8 · attempts 1</p>
+      <p><span class="ts">14:07:22</span>grant used → claims APPLIED</p>
+      <p><span class="ts">14:07:23</span>read-back DENIED ✓</p>
+      <p><span class="ts">14:09:41</span><span class="r">REFUSE</span> ×50 · G6 rate</p>
+      <p><span class="ts">14:09:41</span><span class="r">SUSPEND</span> dr-stamper · in txn</p>
+      <p><span class="ts">14:09:42</span>grants revoked: 0 · requeued: 50</p>
+      <p><span class="ts">14:11:02</span>heartbeat E3 +5.0 s</p>
+    </aside>
+  </div>
+</div>
+
+<!-- C -->
+<div class="frame C" id="C">
+  <header>
+    <div class="mark"><span></span>ProofGate</div>
+    <nav><a class="on">Review</a><a>Supervisor</a><a>Examiner</a></nav>
+    <div class="who"><div class="av">DD</div>dr-demo · Cardiology</div>
+  </header>
+  <div class="grid">
+    <div class="panel">
+      <div class="label">Your queue · 12</div>
+      <div class="qi on"><b>CLM-A-0007</b><small>Echo without prior auth · $1,840</small></div>
+      <div class="qi"><b>CLM-A-0012</b><small>Stress test, duplicate · $960</small></div>
+      <div class="qi"><b>CLM-A-0015</b><small>Holter outside window · $420</small></div>
+      <div class="qi"><b>CLM-A-0021</b><small>Cath lab, code mismatch · $12,300</small></div>
+      <div class="qi"><b>CLM-A-0024</b><small>ECG billed twice · $180</small></div>
+    </div>
+    <div>
+      <div class="tab">Case file</div>
+      <div class="file">
+        <h1>CLM-A-0007</h1>
+        <div class="chips"><span class="chip deny">Agent proposes: deny</span><span class="chip">MP-030 prior auth</span><span class="chip">$1,840</span></div>
+        <div style="color:#4f6469">Service billed without a prior authorization on file. Open every cited document; the server times how long you actually spend.</div>
+        <div class="docs">
+          <div class="doc done"><span class="c">CITED</span><div class="ring" style="background:conic-gradient(#0f6e74 100%, #eef3f4 0)"><span style="background:#fff;width:42px;height:42px;border-radius:50%;display:grid;place-items:center">22s</span></div><b>Claim form</b><small>837P</small></div>
+          <div class="doc"><span class="c">CITED</span><div class="ring" style="background:conic-gradient(#0f6e74 45%, #eef3f4 0)"><span style="background:#fff;width:42px;height:42px;border-radius:50%;display:grid;place-items:center">9s</span></div><b>Prior-auth search</b><small>No match found</small></div>
+          <div class="doc"><div class="ring" style="background:#eef3f4"><span style="background:#fff;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#6c8186">—</span></div><b>Eligibility</b><small>Not cited</small></div>
+        </div>
+        <div class="label">Reviewed so far</div>
+        <div class="bar"><i style="width:100%"></i></div>
+        <div style="display:flex;justify-content:space-between;color:#4f6469;font-size:14px"><span><b style="color:#12262b">31.4 s</b> counted by the server</span><span>policy minimum 30 s</span></div>
+        <div style="margin-top:20px"><button class="btn">Approve denial</button></div>
+      </div>
+    </div>
+    <div class="panel side">
+      <div class="label">Today</div>
+      <div class="stat"><div class="big">1</div>denial executed</div>
+      <div class="stat"><div class="big" style="color:#a3361c">50</div>refused by the gate</div>
+      <div class="stat"><div class="big">122</div>awaiting review</div>
+      <div class="warn"><b>Shortcut available</b><br>Approve all 50 in your queue in one click. The gate will check each one.<button>Select all · approve 50</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.picker button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.picker button').forEach(x => x.classList.toggle('on', x === b));
+    ['A','B','C'].forEach(k => { document.getElementById(k).classList.toggle('on', k === b.dataset.f); document.getElementById('n'+k).style.display = k === b.dataset.f ? '' : 'none'; });
+  });
+</script>
+</body>
+</html>

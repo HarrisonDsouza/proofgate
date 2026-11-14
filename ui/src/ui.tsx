@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { api, type Dashboard } from './api'
 
-export function PageHead({ title, sub, children }: { title: string; sub: string; children?: ReactNode }) {
+export function Title({ title, sub, children }: { title: string; sub: string; children?: ReactNode }) {
   return (
-    <header className="page-head">
+    <header className="title">
       <div>
         <h1>{title}</h1>
         <p>{sub}</p>
@@ -15,36 +15,32 @@ export function PageHead({ title, sub, children }: { title: string; sub: string;
   )
 }
 
-export function Card({ title, hint, right, children, className = '' }: {
-  title?: string; hint?: ReactNode; right?: ReactNode; children: ReactNode; className?: string
+export type Tone = 'good' | 'bad' | 'info'
+
+export function Notice({ tone, head, lines = [], stamp, action }: {
+  tone: Tone; head: string; lines?: string[]; stamp?: { text: string; sub: string; ink: 'red' | 'proof' }; action?: ReactNode
 }) {
   return (
-    <section className={`card ${className}`}>
-      {title && (
-        <div className="card-head">
-          <h2>{title}</h2>
-          {hint && <span className="hint">{hint}</span>}
-          <span className="spacer" />
-          {right}
+    <div className={`notice ${tone}`} role={tone === 'bad' ? 'alert' : 'status'}>
+      <div className="head">{head}</div>
+      {(stamp || action) && (
+        <div className="side">
+          {action}
+          {stamp && (
+            <span className={`stamp ${stamp.ink}`} aria-hidden>
+              {stamp.text}
+              <small>{stamp.sub}</small>
+            </span>
+          )}
         </div>
       )}
-      {children}
-    </section>
-  )
-}
-
-export type Tone = 'good' | 'bad' | 'info'
-export function Banner({ tone, title, lines = [], action }: { tone: Tone; title: string; lines?: string[]; action?: ReactNode }) {
-  return (
-    <div className={`banner ${tone}`} role={tone === 'bad' ? 'alert' : 'status'}>
-      <div className="icon" aria-hidden>{tone === 'good' ? '✓' : tone === 'bad' ? '✕' : 'i'}</div>
-      <div className="title">{title}</div>
-      {action ? <div className="action">{action}</div> : <span />}
-      <div className="lines">
-        {lines.map((l) => (
-          <div key={l}>{l}</div>
-        ))}
-      </div>
+      {lines.length > 0 && (
+        <div className="lines">
+          {lines.map((l) => (
+            <div key={l}>{l}</div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -53,20 +49,20 @@ export function useDashboard() {
   return useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>('/api/dashboard'), refetchInterval: 2000 })
 }
 
-export function Stats() {
+export function Tally() {
   const { data } = useDashboard()
-  const s = (k: string, v: number | undefined, tone = '') => (
-    <div className={`stat ${tone}`}>
+  const col = (k: string, v: number | undefined, ink = '') => (
+    <div>
       <div className="k">{k}</div>
-      <div className="v">{v ?? '—'}</div>
+      <div className={`v ${ink}`}>{v ?? '–'}</div>
     </div>
   )
   return (
-    <div className="stats" aria-live="polite">
-      {s('Denials executed', data?.executed, data?.executed ? 'good' : '')}
-      {s('Refused by the gate', data?.refused, data?.refused ? 'bad' : '')}
-      {s('Reopened after suspension', data?.reversed, data?.reversed ? 'bad' : '')}
-      {s('Awaiting human review', data?.pending)}
+    <div className="tally" aria-live="polite">
+      {col('Denials executed', data?.executed, data?.executed ? 'proof' : '')}
+      {col('Refused by the gate', data?.refused, data?.refused ? 'red' : '')}
+      {col('Reopened after suspension', data?.reversed, data?.reversed ? 'red' : '')}
+      {col('Awaiting human review', data?.pending)}
     </div>
   )
 }

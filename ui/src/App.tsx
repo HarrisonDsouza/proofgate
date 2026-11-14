@@ -1,21 +1,24 @@
+import { FileSearch, Inbox, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { store, TENANT } from './api'
+import { api, store, TENANT, type Policy } from './api'
 import Examiner from './pages/Examiner'
 import Review from './pages/Review'
 import Supervisor from './pages/Supervisor'
-import { useDashboard } from './ui'
+import { Tally, useDashboard } from './ui'
+import { useQuery } from '@tanstack/react-query'
 
 function ConsoleKey() {
   const [key, setKey] = useState(store.key())
   return (
-    <label>
-      Console key
+    <label className="keyfield">
+      <span>Console key</span>
       <input
         type="password"
         autoComplete="off"
         value={key}
-        placeholder="Paste once per tab"
+        placeholder="paste once"
+        aria-label="Console key"
         onChange={(e) => {
           setKey(e.target.value)
           store.setKey(e.target.value)
@@ -25,45 +28,39 @@ function ConsoleKey() {
   )
 }
 
-function Connection() {
+function Folio() {
   const { isSuccess, isError } = useDashboard()
+  const pol = useQuery({ queryKey: ['policy'], queryFn: () => api<Policy[]>('/api/policies') })
+  const v = pol.data?.find((p) => p.status === 'active')?.version
   return (
-    <div className="meta">
+    <div className="folio">
       <span>
-        <span className={`status-dot ${isSuccess ? 'on' : ''}`} aria-hidden />
-        {isSuccess ? 'Atlas connected' : isError ? 'API unreachable' : 'Connecting…'}
+        <span className={`dot ${isSuccess ? 'on' : ''}`} aria-hidden />
+        {isSuccess ? 'Atlas' : isError ? 'API unreachable' : 'connecting'}
       </span>
+      <span>{TENANT.toUpperCase()}</span>
+      <span>POLICY v{v ?? '–'}</span>
+      <ConsoleKey />
     </div>
   )
 }
 
 export default function App() {
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="logo" aria-hidden>PG</div>
-          <div>
-            <strong>ProofGate</strong>
-            <small>No proof of review, no denial.</small>
-          </div>
-        </div>
+    <>
+      <header className="masthead">
+        <NavLink to="/review" className="wordmark" aria-label="ProofGate home">
+          Proof<i>Gate</i>
+        </NavLink>
         <nav className="nav" aria-label="Main">
-          <div className="nav-label">Workspace</div>
-          <NavLink to="/review"><span className="ico" aria-hidden>▤</span>Review queue</NavLink>
-          <NavLink to="/supervisor"><span className="ico" aria-hidden>◎</span>Supervisor</NavLink>
-          <NavLink to="/examiner"><span className="ico" aria-hidden>⌕</span>Examiner</NavLink>
+          <NavLink to="/review"><Inbox aria-hidden />Review</NavLink>
+          <NavLink to="/supervisor"><SlidersHorizontal aria-hidden />Supervisor</NavLink>
+          <NavLink to="/examiner"><FileSearch aria-hidden />Examiner</NavLink>
         </nav>
-        <div className="sidebar-foot">
-          <div className="meta">
-            <span>Tenant</span>
-            <span className="mono">{TENANT}</span>
-          </div>
-          <ConsoleKey />
-          <Connection />
-        </div>
-      </aside>
-      <main className="content">
+        <Folio />
+      </header>
+      <Tally />
+      <main className="page">
         <Routes>
           <Route path="/" element={<Navigate to="/review" replace />} />
           <Route path="/review" element={<Review />} />
@@ -71,10 +68,10 @@ export default function App() {
           <Route path="/examiner" element={<Examiner />} />
           <Route path="/examiner/:caseId" element={<Examiner />} />
         </Routes>
-        <p className="footnote">
-          Synthetic data only. Every decision is made by one MongoDB Atlas transaction; this console only displays it.
-        </p>
       </main>
-    </div>
+      <footer className="colophon">
+        Synthetic data only. Every decision is one MongoDB Atlas transaction; this console only shows what Atlas recorded.
+      </footer>
+    </>
   )
 }

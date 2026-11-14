@@ -11,6 +11,8 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 | #3 | Harry / `harry` | Tech-lead PR review replaces the API-key reviewer; work log; plan critique | tech lead | `make ci` PASS | OK | 13:03 |
 | #4 | Harry / `harry` | Research reports, FIXES.md must-fix list, doc corrections (docs only) | tech lead | `make ci` PASS | OK | 13:07 |
 | #5 | Harry / `harry` | Atlas-tier research, FIXES.md A1-A3, work-log time fixes (docs only) | tech lead | `make ci` PASS | OK | 13:08 |
+| #6 | Harry / `harry` | Security P1: console key on sessions and the control plane, refuse weak agent key, removed HTTP compensate and debug pause, paused run-once fix, bulk banner | tech lead | `make ci` 46 passed; live curl 401/401/405 | OK | 13:12 |
+| #8 | Sukhman / `sukhman` | Gate and detector hardening, streaming CUSUM, kill/restart test, voice layer (+1342) | code review + security retest + Atlas run | Atlas: test-conflict 6/6, test-restart 5/5, bypass 3/3; ci 68/69 (validator enum; fixed by setup) | **merge after fixes** (8 must-fix, see PR comment) | — |
 
 ## Events
 
@@ -29,13 +31,27 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
 - **13:07** Neil's tools research is in ([research/neil-tools.md](research/neil-tools.md)): use `scribe_v3`, then `scribe_v2`; LangSmith redaction hooks are confirmed; no ElevenLabs prize criteria are published. Fixed elevenlabs.md and langsmith-setup.md to match.
 - **13:07** Baseline code review is in: **FAIL** ([research/code-review-baseline.md](research/code-review-baseline.md)). Security review and code review merged into one owner-by-owner list: [FIXES.md](FIXES.md).
 - **13:08** Atlas-tier research is in ([research/atlas-tier.md](research/atlas-tier.md)): transactions and change streams work on Free, Flex and M10; every in-transaction operation passes the session; the smoke test's exit code can't be trusted. Rows A1-A3 added to FIXES.md. All six agents are done.
+- **13:39** Atlas is live: an M10 cluster in the hackathon sandbox project. On it:
+  - `make smoke`: PASS (transaction and change stream)
+  - `make setup` and `make seed`: 200 cases, 123 proposed denials (setup re-runs fine, so the role is OK)
+  - `make bypass`: 3 PASS (no grant → 403, made-up grant → 403, record unchanged)
+  - `make test-conflict`: (a), (b) and (c) all PASS, including the forged burst executing 0 of 50
+  - `/rules`: R1-R8 all pass
+  - the API starts with the new keys, and `/api/sessions` without the console key returns 401
+  - **Note:** each gate call takes about 1.7 s from this laptop, so a 50-item burst takes about 90 s; the demo plan should allow for it.
+- **14:01** Added `make e2e` (honest path over HTTP, then a supervisor halt) and ran it on Atlas: **ALL PASS**.
+  - dr-demo's review of CLM-A-0003 was credited by the server at about 22 s per cited item.
+  - The approval was accepted; the executor executed 1 of 1; the denial is CONFIRMED by read-back; the claims record is DENIED.
+  - R1-R8 pass.
+  - The halt created 1 compensation, which was confirmed; the record is OPEN again; R1-R8 still pass.
+  - Together with test-conflict (forged burst 0 of 50) and bypass (403), **the core demo works: `core-ok`**.
 
 ## Checkpoints
 
 | Time | Checkpoint | Status |
 |---|---|---|
-| 13:15 | smoke, setup and seed on the sandbox; `make bypass` PASS | blocked: no Atlas cluster yet |
-| 13:45 | core demo works; tag `core-ok` | |
+| 13:15 | smoke, setup and seed on the sandbox; `make bypass` PASS | **met at 13:39** (late) |
+| 13:45 | core demo works; tag `core-ok` | **met at 14:01** (late) |
 | 14:30 | PREREGISTRATION merged before the held-out eval | |
 | 16:00 | feature freeze | |
 | 16:45 | submitted | |

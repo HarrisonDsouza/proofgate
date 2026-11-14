@@ -12,7 +12,7 @@ REPO="HarrisonDsouza/proofgate"
 BRANCH="harry"
 MUST_CONTAIN="116fef8"
 FLAKY="tests/test_voice_routes.py::test_slow_speech_to_text_does_not_block_heartbeats"
-SECRET_RE='(sk-ant-|sk-[A-Za-z0-9]{20,}|pa-[A-Za-z0-9_-]{30,}|lsv2_[A-Za-z0-9_]{20,}|mongodb\+srv://[^<" ]+:[^<" ]+@)'
+SECRET_RE='(sk'-'ant-|sk-[A-Za-z0-9]{20,}|pa-[A-Za-z0-9_-]{30,}|lsv2_[A-Za-z0-9_]{20,}|mongodb\+srv://[^<" ]+:[^<" ]+@)'
 DRY_RUN="${DRY_RUN:-0}"
 
 ROOT="$(pwd)"

@@ -69,7 +69,7 @@ VALIDATORS = {
                                     "created_at": {"bsonType": "date"}}},
 }
 PLAIN = ["cases", "target_records", "target_log", "policy_clauses", "reviewer_sessions", "view_tokens",
-         "reviewer_state", "chain_heads", "detector_state", "agent_control", "eval_runs"]
+         "reviewer_state", "chain_heads", "detector_state", "agent_control", "eval_runs", "reviewer_stats"]
 
 INDEXES = {
     "cases": [([("tenant_id", A), ("case_id", A)], {"unique": True})],

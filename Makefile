@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
+.PHONY: test-restart ci secret-scan install smoke setup seed reset dev detector test lint rules bypass test-conflict explain eval eval-heldout baseline calibrate-detector calibrate-prd codes deploy
 
 install:      ; pip install -r requirements-dev.txt
 smoke:        ; python -m pg.db --smoke
@@ -15,6 +15,7 @@ lint:         ; ruff check pg eval seed tests data
 rules:        ; curl -s "localhost:8080/rules?tenant=payer-acme" | python -m json.tool
 bypass:       ; python -m eval.bypass
 test-conflict:; DEMO_DEBUG_HOOKS=true python -m eval.test_conflict
+test-restart: ; python -m eval.test_detector_restart
 explain:      ; curl -s -H "X-Tenant-Id: payer-acme" localhost:8080/api/explain/window | python -m json.tool
 codes:        ; python -m data.pipeline.codes
 calibrate-detector: ; python -m eval.calibrate_detector --tenant payer-live

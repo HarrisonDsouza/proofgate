@@ -14,8 +14,10 @@ from fastapi import HTTPException
 from pg import gate, target
 from pg.config import AGENT_ID, OPERATOR_ID
 from pg.db import get_db
+from pg.observability import traceable
 
 
+@traceable("agent.triage")
 def triage(case: dict, clauses: list[dict]) -> dict:
     """Deterministic rule: deny when the prior-auth evidence says 'none on file' and the policy needs one."""
     ev = {e["evidence_id"]: e for e in case["evidence"]}
@@ -30,6 +32,7 @@ def triage(case: dict, clauses: list[dict]) -> dict:
             "cited_clauses": [clause] if clause else []}
 
 
+@traceable("executor.execute_one")  # LangSmith trace when LANGSMITH_TRACING=true; no-op otherwise
 def execute_one(tenant: str, proposal: dict) -> dict:
     res = gate.execute(tenant, proposal["proposal_id"], proposal["approval_id"], AGENT_ID, OPERATOR_ID)
     if res["decision"] != "ALLOW":

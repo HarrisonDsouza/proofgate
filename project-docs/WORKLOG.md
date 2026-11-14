@@ -51,8 +51,8 @@ The tech lead (Harry's Claude Code session) keeps this log. Every PR, review ver
   - Together with test-conflict (forged burst 0 of 50) and bypass (403), **the core demo works: `core-ok`**.
 - 14:17 PR #12 opened: professional UI redesign + Supervisor page. Alignment audit (plan vs PRD, judge must-fixes, organizer rules) started; report goes to project-docs/research/alignment-audit.md.
 - 14:30 Alignment audit written (project-docs/research/alignment-audit.md): eval crash found (int dict keys in eval/simulate.py) and fixed; Makefile calibrate targets passed an unsupported --floor flag, fixed.
-- 14:35 Dev eval (seed 1) ran clean on Atlas, ~6 min; numbers not reported. PREREGISTRATION.md filled and committed (7df270e) before the held-out run.
-- 14:41 Held-out eval (seed 20261114) run once on Atlas; output saved unedited to docs/eval-heldout.txt.
+- 14:20 Dev eval (seed 1) ran clean on Atlas; numbers not reported. 14:25 PREREGISTRATION.md committed (7df270e) before the held-out run (its "Committed at 14:58" line is a typo; git time is authoritative).
+- 14:31 Held-out eval (seed 20261114) run once on Atlas; output committed unedited to docs/eval-heldout.txt (350d06c).
 - 14:45 First baseline run discarded: its detector thread died on a scratch tenant created by PR #8 tests run at the same time (old detector did not catch LookupError). Re-run after merge.
 - 14:47 PR #8 merged after Atlas checks. Verdict comment on the PR lists follow-ups (gate.confirm 500 on unknown denial, /rules unauthenticated, seed not clearing attestations).
 - 14:55 PR #12 updated with the Ledger + Case File design; Impeccable and Diagram Design skills installed for Harry (files read first). Flow diagram in project-docs/design/.

@@ -207,7 +207,7 @@ def approve(tenant: str, session_id: str, proposal_id: str, attestation_text: st
 
 
 def approve_bulk(tenant: str, session_id: str, proposal_ids: list[str], attestation_text: str) -> dict:
-    """The deliberate 'Select all, approve 50': same logic in a loop. The gate decides what executes."""
+    """The deliberate 'Select all, approve 50': same records as approve() per id, one transaction. The gate decides what executes."""
     pids = list(dict.fromkeys(proposal_ids))  # de-duplicate, keep order
     found = {p["proposal_id"] for p in get_db().proposals.find({"tenant_id": tenant, "proposal_id": {"$in": pids},
                                                                   "status": {"$in": ["pending_review", "needs_review"]}},

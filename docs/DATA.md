@@ -29,10 +29,12 @@
 | Medicare Advantage prior-auth determinations, 2024 | 52.8 million | [KFF](https://www.kff.org/medicare/medicare-advantage-insurers-made-nearly-53-million-prior-authorization-determinations-in-2024/) |
 | Fully or partially denied | 4.1 million (7.7%) | KFF |
 | Denials appealed | 11.5% | KFF |
-| Appeals overturned | 80.7% | KFF |
+| Appeals overturned (fully or partially) | 80.7% — say "fully or partially"; a different KFF analysis of standard requests under the 2024 CMS rule reports 67%, so name the source | KFF |
 | Denial rate range by insurer | 4.2% (Elevance) – 12.8% (UnitedHealth Group) | KFF |
-| ACA Marketplace in-network claims denied, 2024 | ~85 million (19%); < 1% appealed | KFF analysis of the CMS Transparency in Coverage PUF, [summary](https://insurancenewsnet.com/oarticle/claims-denials-and-appeals-in-aca-marketplace-plans-in-2024) (open the KFF page itself) |
+| ACA Marketplace (HealthCare.gov) in-network claims denied, 2024 | ~85 million of ~451 million (19%); < 1% appealed; 66% of those appeals upheld | KFF analysis of the CMS Transparency in Coverage PUF, [summary](https://insurancenewsnet.com/oarticle/claims-denials-and-appeals-in-aca-marketplace-plans-in-2024) (open the KFF page itself) |
 | The PxDx pattern as reported | 300,000+ denials in two months of 2022, ~1.2 s each, "50 at a time" | [ProPublica 2023](https://www.propublica.org/article/cigna-pxdx-medical-health-insurance-rejection-claims). **Always add: Cigna disputes it and says PxDx is not AI** |
+
+**Verification status (2026-11-14, by web search of kff.org result text, not by reading the full pages):** 52.8M determinations, 4.1M (7.7%) denied, 11.5% appealed, 80.7% fully-or-partially overturned, and the ACA 85M/19%/<1%/66% were all confirmed against KFF's own result summaries. Still open each page once before stating a number on stage; the ACA figures cover HealthCare.gov plans only. The PxDx row is ProPublica's reporting that Cigna disputes; it was not re-verified today.
 
 These are US figures; we are in Toronto. Say "US" plainly.
 
@@ -48,3 +50,20 @@ These are US figures; we are in Toronto. Say "US" plainly.
 ## 5. Limits
 Synthetic cases; volunteers are not physicians; dwell is server-observed behaviour, not proof of reading; cited figures
 were not reloaded from source files today.
+
+
+## 6. Measured results (produced today by our own commands; never quote anything not in this section)
+Environment: a LOCAL MongoDB 7 replica set in Docker, not the Atlas sandbox. Re-run every command on Atlas before quoting. The evaluation is time-scaled and the non-honest behaviours are synthetic models.
+
+| Command | Result |
+|---|---|
+| `make test-conflict` | (a) in-flight denial refused with G2 after suspension, 2 attempts; (b) exactly one of two concurrent decisions retried; (c) forged 45 s `dwell_ms` burst executes 0 of 50 |
+| `make bypass` | no grant and made-up grant both 403, record unchanged |
+| `make rules` | R1-R8 all pass |
+| `make test-restart` | detector SIGKILLed mid-burst, restarted: one suspension, source `change_stream`; second kill/restart: still one; first start with no token: caught up (`detector_catchup`) |
+| `pytest tests/test_gate_stress.py` | 8 concurrent executes of one approval: exactly 1 ALLOW; suspension raced against 8 gate calls (6 runs): no ALLOW committed after it |
+| `make eval-heldout` (seed 20261114, CUSUM on) | stamper 0/200 executed, 4/4 suspended; tab-idler 0/32, 4/4; skimmer 0/32, 4/4; honest 95/96 executed, 0 suspended; drifter 4/4 suspended by CUSUM; fast-honest 20/32 executed, 1/4 suspended; heartbeat forger 16/16 executed and floor-gamer 32/32 executed (the documented null results) |
+| overall | false refusal 13/128 (10.2%, 95% CI 6.0-16.6%); false suspension 1/16 (6.2%, CI 1.1-28.3%): small n, say so |
+| `make calibrate-prd` | CUSUM threshold h=5.75 certified on the PRD's SYNTHETIC honest model (not volunteers): honest@75 s falsely suspended 5.0%, honest@35 s 5.75%, drifter caught 65.5%, floor-gamer-from-start caught 0% |
+
+Honest reading: the calibration targets 5% false suspension and measured 5.0% and 5.75% on fresh draws, so say "about 5%", not "under 5%". Real volunteer sessions would replace the synthetic model (`make calibrate-detector`).

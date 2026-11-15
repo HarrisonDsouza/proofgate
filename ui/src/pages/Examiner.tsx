@@ -56,6 +56,78 @@ function Verdict({ d }: { d: Ex }) {
   )
 }
 
+/* Proof at a glance: the same facts as the numbered steps below, but visible without scrolling.
+   Everything here is read from the stored case; nothing is computed in the browser except bar widths. */
+function ProofStrip({ d }: { d: Ex }) {
+  const g = d.gate_decisions?.at(-1)
+  if (!g?.checks?.length) return null
+  const dwell = (d.approval?.active_dwell_ms ?? 0) as number
+  const floor = ((g.checks.find((c: any) => String(c.rule).startsWith('G5'))?.required ?? 0) as number) || 0
+  const top = Math.max(dwell, floor, 1)
+  const views: any[] = d.views ?? []
+  const biggest = Math.max(1, ...views.map((v) => v.active_ms ?? 0))
+  const passed = g.checks.filter((c: any) => c.pass).length
+  const seals: { label: string; ok: boolean | null; note: string }[] = [
+    { label: 'Time recomputed from raw events', ok: d.chain ? !!d.chain.dwell_matches : null, note: d.chain ? secs(d.chain.dwell_recomputed_ms) : 'no approval' },
+    { label: 'Review history hash chain', ok: d.chain ? !!d.chain.review_events_ok : null, note: d.chain?.review_events_ok ? 'intact' : 'broken or absent' },
+    { label: 'Single-use grant', ok: d.grant ? d.grant.status !== 'issued' : null, note: d.grant ? String(d.grant.status) : 'none minted' },
+    { label: 'Claims system read back', ok: d.denial?.readback ? d.denial.readback.status === 'DENIED' : null, note: d.denial?.readback?.status ?? 'not applied' },
+  ]
+  return (
+    <section className="glance" aria-label="Proof at a glance">
+      <div className="glance-time">
+        <div className="glance-head">
+          <h2>Reading time, counted by the server</h2>
+          <span className="mono">
+            <b>{secs(dwell)}</b> counted · floor {secs(floor)}
+          </span>
+        </div>
+        <div className="meter" role="img" aria-label={`${secs(dwell)} counted against a ${secs(floor)} floor`}>
+          <i className={dwell >= floor ? 'met' : 'short'} style={{ width: `${Math.min(100, (dwell / top) * 100)}%` }} />
+          {floor > 0 && <u style={{ left: `${(floor / top) * 100}%` }} title="policy floor" />}
+        </div>
+        <ul className="glance-docs">
+          {views.map((v) => (
+            <li key={v.evidence_id + v.opened_at}>
+              <span className="mono">{v.evidence_id}</span>
+              <span className="bar"><i style={{ width: `${((v.active_ms ?? 0) / biggest) * 100}%` }} /></span>
+              <span className="mono">{secs(v.active_ms)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="glance-rules">
+        <div className="glance-head">
+          <h2>Gate rules</h2>
+          <span className="mono"><b>{passed} of {g.checks.length}</b> passed · policy v{g.policy_version}</span>
+        </div>
+        <ul className="chips">
+          {g.checks.map((c: any) => (
+            <li key={c.rule} className={c.pass ? 'ok' : 'no'}>
+              {c.pass ? <Check aria-label="passed" /> : <X aria-label="failed" />}
+              <span className="code">{String(c.rule).split('_')[0]}</span>
+              <span>{ruleName(c.rule)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <ul className="seals" aria-label="Integrity checks">
+        {seals.map((s) => (
+          <li key={s.label} className={s.ok === true ? 'ok' : s.ok === false ? 'no' : ''}>
+            <span className="seal-mark" aria-hidden>{s.ok === true ? '✓' : s.ok === false ? '✗' : '–'}</span>
+            <span>
+              {s.label}
+              <small className="mono">{s.note}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function Examiner() {
   const { caseId } = useParams()
   const nav = useNavigate()
@@ -91,6 +163,7 @@ export default function Examiner() {
       {q.isError && <Notice tone="bad" head={`Could not load ${caseId}`} />}
       {d && !d.case && <Notice tone="bad" head={`No case ${caseId} in this tenant`} />}
       {d?.case && <Verdict d={d} />}
+      {d?.case && <ProofStrip d={d} />}
       {d?.case && <AgentTrace caseId={d.case.case_id} />}
       {d?.case && (
         <ol className="entries">

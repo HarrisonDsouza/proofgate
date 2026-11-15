@@ -67,6 +67,11 @@ export default function Review() {
   const total = Object.keys(credited).reduce((a, k) => a + (shown(k) ?? 0), 0)
   const cited = picked?.cited_evidence ?? []
   const ready = cited.length > 0 && total >= floor && cited.every((e) => (shown(e.evidence_id) ?? 0) >= itemFloor)
+  // What is still missing, in the gate's own terms, so a reviewer (or a judge) is never guessing why it would refuse.
+  const missing = [
+    ...(total < floor ? [`${secs(floor - total)} more reading time`] : []),
+    ...cited.filter((e) => (shown(e.evidence_id) ?? 0) < itemFloor).map((e) => `${e.evidence_id} needs ${secs(itemFloor - (shown(e.evidence_id) ?? 0))} more`),
+  ]
 
   async function start() {
     setBusy('session')
@@ -318,7 +323,9 @@ export default function Review() {
               </button>
             </div>
             <p className={`hint ${ready ? 'met' : ''}`} style={{ margin: '-12px 0 0' }}>
-              {ready ? 'Review requirements met. The gate still checks everything again in one transaction.' : 'You can approve early: the gate will refuse and say which rule failed.'}
+              {ready
+                ? 'Review requirements met. The gate still checks everything again in one transaction.'
+                : `Still needed: ${missing.join(' · ') || 'open every cited document'}. You can approve early; the gate will refuse and name the rule.`}
             </p>
           </article>
         )}

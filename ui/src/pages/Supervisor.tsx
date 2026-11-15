@@ -1,11 +1,34 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Pause, Play, UserX } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { api, ruleName, secs, type Policy } from '../api'
 import { Notice, Spin, Title, useDashboard, type Tone } from '../ui'
 import { errText } from './Review'
 
 const REVIEWERS = ['dr-demo', 'dr-stamper', 'dr-skim', 'dr-cardio', 'dr-expired', 'vol-1', 'vol-2', 'vol-3']
+type Evidence = { floor_ms: number | null; dwell: { approval_id: string; active_dwell_ms: number | null }[] }
+
+function FlagEvidence({ reviewer }: { reviewer: string }) {
+  const { data, isLoading } = useQuery({ queryKey: ['flag-evidence', reviewer], queryFn: () => api<Evidence>(`/api/reviewers/${encodeURIComponent(reviewer)}/flag-evidence`) })
+  if (isLoading) return <Spin />
+  const rows = data?.dwell ?? []
+  if (!rows.length) return <p className="empty">No approvals recorded for this reviewer.</p>
+  const floor = data?.floor_ms ?? 0
+  const top = Math.max(floor * 1.5, ...rows.map((r) => r.active_dwell_ms ?? 0), 1)
+  const under = rows.filter((r) => (r.active_dwell_ms ?? 0) < floor).length
+  return (
+    <div role="img" aria-label={`${rows.length} approvals, ${under} under the ${secs(floor)} floor`}>
+      <p className="subtle">Server-timed review per approval, oldest first. The line is the policy floor ({secs(floor)}); {under} of {rows.length} are under it.</p>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 4, height: 96, borderBottom: '1px solid var(--rule)' }}>
+        <span style={{ position: 'absolute', left: 0, right: 0, bottom: `${(floor / top) * 100}%`, borderTop: '2px solid var(--ink)' }} />
+        {rows.map((r) => (
+          <i key={r.approval_id} style={{ flex: 1, minWidth: 4, height: `${Math.max(((r.active_dwell_ms ?? 0) / top) * 100, 2)}%`, background: (r.active_dwell_ms ?? 0) < floor ? 'var(--red)' : 'var(--proof)' }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const when = (t?: string) => (t ? new Date(t).toLocaleTimeString() : '–')
 const LABELS: Record<string, string> = {
   min_active_dwell_ms: 'Server-timed review per case, at least',
@@ -29,6 +52,7 @@ export default function Supervisor() {
   const [floorS, setFloorS] = useState('')
   const [who, setWho] = useState('dr-stamper')
   const [paused, setPaused] = useState<boolean | null>(null)
+  const [evidenceFor, setEvidenceFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ tone: Tone; head: string; lines?: string[] } | null>(null)
 
@@ -192,15 +216,25 @@ export default function Supervisor() {
             <p className="empty">No reviewer has been suspended.</p>
           ) : (
             <table>
-              <thead><tr><th>Reviewer</th><th>Rule</th><th>By</th><th className="r">When</th></tr></thead>
+              <thead><tr><th>Reviewer</th><th>Rule</th><th>By</th><th className="r">When</th><th><span className="sr-only">Evidence</span></th></tr></thead>
               <tbody>
                 {d.suspensions.map((s) => (
-                  <tr key={s.suspension_id}>
+                  <Fragment key={s.suspension_id}>
+                  <tr>
                     <td className="mono">{s.reviewer_id} {s.active && <span className="tag red">active</span>}</td>
                     <td className="mono">{s.rule}</td>
                     <td>{s.source.replaceAll('_', ' ')}</td>
                     <td className="r mono subtle">{when(s.ts)}</td>
+                    <td className="r">
+                      <button type="button" className="btn" aria-expanded={evidenceFor === s.suspension_id} onClick={() => setEvidenceFor(evidenceFor === s.suspension_id ? null : s.suspension_id)}>
+                        {evidenceFor === s.suspension_id ? 'Hide evidence' : 'Show evidence'}
+                      </button>
+                    </td>
                   </tr>
+                  {evidenceFor === s.suspension_id && (
+                    <tr key={s.suspension_id + '-ev'}><td colSpan={5}><FlagEvidence reviewer={s.reviewer_id} /></td></tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

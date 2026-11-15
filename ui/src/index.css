@@ -309,3 +309,5 @@ blockquote { margin: 10px 0; padding: 0 0 0 16px; border-left: 1px solid var(--i
 
 /* Touch devices: controls reach a 44px target (WCAG 2.5.8 target size, platform guidance). */
 @media (pointer: coarse) { .btn, .nav a, input, select, .keyfield input { min-height: 44px; } }
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

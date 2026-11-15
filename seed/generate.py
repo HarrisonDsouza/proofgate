@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,7 +102,12 @@ def seed_tenant(db, tenant: str, n_cases: int, seed: int, scale: int = 1, review
     db.review_policies.insert_one({"tenant_id": tenant, "policy_id": f"{tenant.split('-')[-1]}-claim_denial", "action_type": "claim_denial",
                                    "version": 1, "status": "active", "rationale": RATIONALE + (f" Time-scaled /{scale}." if scale > 1 else ""),
                                    "created_by": "seed", "created_at": t0, "rules": rules,
-                                   "effect": {"kind": "claim", "apply_status": "DENIED", "compensate_status": "OPEN"}})
+                                   "effect": {"kind": "claim", "apply_status": "DENIED", "compensate_status": "OPEN"},
+                                   # Self-baselined CUSUM. Values come from `make calibrate-detector` on the SYNTHETIC honest
+                                   # model (docs/DATA.md §7), not real reviewers; the policy says so, so nobody reads it as measured.
+                                   "detector": {"cusum": {"mode": "self", "sigma": 0.4, "h": 5.75, "drop": math.log(2), "warmup": 5,
+                                                          "source": "synthetic calibration, not real reviewers"},
+                                                **({"time_scale": scale} if scale > 1 else {})}})
     db.agent_control.update_one({"_id": f"executor|{tenant}"}, {"$set": {"paused": False}}, upsert=True)
     return {"cases": len(cases), "deny_proposals": sum(p["recommendation"] == "deny" for p in props)}
 

@@ -43,18 +43,22 @@ def apply(tenant: str, kind: str, record_id: str, to_status: str, grant_header: 
 def compensate(tenant: str, kind: str, record_id: str, to_status: str, denial_id: str, caller: str) -> dict:
     """Idempotent per denial_id: a repeat call is a no-op."""
     db = get_db()
-    rec = db.target_records.find_one({"tenant_id": tenant, "kind": kind, "record_id": record_id})
-    if rec is None:
-        raise HTTPException(404, "unknown record")
-    if denial_id in rec.get("reopened_for", []):
-        with client().start_session() as s:
-            _log(db, s, tenant, kind, record_id, caller, "compensate", "NOOP_IDEMPOTENT", denial_id=denial_id)
-        return {"status": rec["status"], "noop": True}
-    db.target_records.update_one({"_id": rec["_id"]}, {"$set": {"status": to_status}, "$addToSet": {"reopened_for": denial_id},
-                                                       "$push": {"history": {"op": "compensate", "to": to_status, "denial_id": denial_id, "at": now()}}})
+    # One atomic conditional update: of two concurrent calls for the same denial_id exactly one matches the filter,
+    # so the history gets one entry and the loser is a no-op (the old read-then-write let both through).
+    res = db.target_records.update_one(
+        {"tenant_id": tenant, "kind": kind, "record_id": record_id, "reopened_for": {"$ne": denial_id}},
+        {"$set": {"status": to_status}, "$addToSet": {"reopened_for": denial_id},
+         "$push": {"history": {"op": "compensate", "to": to_status, "denial_id": denial_id, "at": now()}}})
+    if res.matched_count == 0:
+        rec = db.target_records.find_one({"tenant_id": tenant, "kind": kind, "record_id": record_id})
+        if rec is None:
+            raise HTTPException(404, "unknown record")
+        outcome, out = "NOOP_IDEMPOTENT", {"status": rec["status"], "noop": True}
+    else:
+        outcome, out = "COMPENSATED", {"status": to_status, "noop": False}
     with client().start_session() as s:
-        _log(db, s, tenant, kind, record_id, caller, "compensate", "COMPENSATED", denial_id=denial_id)
-    return {"status": to_status, "noop": False}
+        _log(db, s, tenant, kind, record_id, caller, "compensate", outcome, denial_id=denial_id)
+    return out
 
 
 @router.post("/{kind}/{record_id}/apply")

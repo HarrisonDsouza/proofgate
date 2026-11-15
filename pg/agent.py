@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import HTTPException
 
@@ -62,6 +63,9 @@ def execute_one(tenant: str, proposal: dict) -> dict:
     return res | {"confirm": _gate_confirm(tenant, res["denial_id"])}
 
 
+EXECUTOR_WORKERS = 4
+
+
 def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool = False) -> list[dict]:
     db = get_db()
     results = []
@@ -72,12 +76,26 @@ def executor_loop(tenant: str, stop: threading.Event | None = None, once: bool =
             time.sleep(0.5)
             continue
         batch = list(db.proposals.find({"tenant_id": tenant, "status": "approved", "recommendation": "deny"}).limit(100))
+        # Proposals of DIFFERENT reviewers go through the gate in parallel. One reviewer's proposals still serialize,
+        # because every gate transaction writes that reviewer's version-checked reviewer_state (a conflict is retried).
+        # The gate stays the only authority: parallelism only changes how fast it is asked, never what it decides.
+        by_reviewer: dict[str, list[dict]] = {}
         for p in batch:
-            # Re-read before acting: a suspension mid-batch sends the rest back to review, and asking the gate about
-            # each of those costs a full transaction (~1.9 s on the sandbox) for a certain refusal.
-            if not db.proposals.find_one({"_id": p["_id"], "status": "approved"}, {"_id": 1}):
-                continue
-            results.append(execute_one(tenant, p))
+            by_reviewer.setdefault(str(p.get("approved_by") or p["_id"]), []).append(p)
+
+        def run_group(group: list[dict]) -> list[dict]:
+            out = []
+            for p in group:
+                # Re-read before acting: a suspension mid-batch sends the rest back to review, and asking the gate about
+                # each of those costs a full transaction (~1.9 s on the sandbox) for a certain refusal.
+                if not db.proposals.find_one({"_id": p["_id"], "status": "approved"}, {"_id": 1}):
+                    continue
+                out.append(execute_one(tenant, p))
+            return out
+
+        with ThreadPoolExecutor(max_workers=EXECUTOR_WORKERS) as pool:
+            for part in pool.map(run_group, by_reviewer.values()):
+                results.extend(part)
         if once:
             return results
         time.sleep(0.3)

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Check, X } from 'lucide-react'
+import { Check, Minus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, refusalReason, ruleName, secs } from '../api'
@@ -79,7 +79,7 @@ function ProofStrip({ d }: { d: Ex }) {
         <div className="glance-head">
           <h2>Reading time, counted by the server</h2>
           <span className="mono">
-            <b>{secs(dwell)}</b> counted · floor {secs(floor)}
+            <b>{secs(dwell)}</b> counted, floor {secs(floor)}
           </span>
         </div>
         <div className="meter" role="img" aria-label={`${secs(dwell)} counted against a ${secs(floor)} floor`}>
@@ -100,7 +100,7 @@ function ProofStrip({ d }: { d: Ex }) {
       <div className="glance-rules">
         <div className="glance-head">
           <h2>Gate rules</h2>
-          <span className="mono"><b>{passed} of {g.checks.length}</b> passed · policy v{g.policy_version}</span>
+          <span className="mono"><b>{passed} of {g.checks.length}</b> passed under policy v{g.policy_version}</span>
         </div>
         <ul className="chips">
           {g.checks.map((c: any) => (
@@ -116,7 +116,7 @@ function ProofStrip({ d }: { d: Ex }) {
       <ul className="seals" aria-label="Integrity checks">
         {seals.map((s) => (
           <li key={s.label} className={s.ok === true ? 'ok' : s.ok === false ? 'no' : ''}>
-            <span className="seal-mark" aria-hidden>{s.ok === true ? '✓' : s.ok === false ? '✗' : '–'}</span>
+            <span className="seal-mark" aria-hidden>{s.ok === true ? <Check /> : s.ok === false ? <X /> : <Minus />}</span>
             <span>
               {s.label}
               <small className="mono">{s.note}</small>

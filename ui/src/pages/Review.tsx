@@ -325,7 +325,7 @@ export default function Review() {
             <p className={`hint ${ready ? 'met' : ''}`} style={{ margin: '-12px 0 0' }}>
               {ready
                 ? 'Review requirements met. The gate still checks everything again in one transaction.'
-                : `Still needed: ${missing.join(' · ') || 'open every cited document'}. You can approve early; the gate will refuse and name the rule.`}
+                : `Still needed: ${missing.join('; ') || 'open every cited document'}. You can approve early; the gate will refuse and name the rule.`}
             </p>
           </article>
         )}

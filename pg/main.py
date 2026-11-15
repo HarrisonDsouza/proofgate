@@ -214,6 +214,25 @@ def dashboard(x_tenant_id: str = Header(...)):
                   "last_burst": (db.agent_control.find_one({"_id": f"executor|{x_tenant_id}"}) or {}).get("last_burst")})
 
 
+@app.get("/api/reviewers/{reviewer_id}/flag-evidence")
+def flag_evidence(reviewer_id: str, limit: int = Query(30, ge=1, le=200), x_tenant_id: str = Header(...)):
+    """Why was this reviewer flagged? The latest suspension (rule + what the detector observed) next to the
+    reviewer's own server-timed dwell per approval and the policy floor, so a reviewer or supervisor sees the same
+    evidence the detector used. Read-only, tenant-scoped; no grants or tokens are returned."""
+    db = get_db()
+    t = {"tenant_id": x_tenant_id, "reviewer_id": reviewer_id}
+    susp = db.suspensions.find_one(t, {"_id": 0}, sort=[("ts", -1)])
+    policy = db.review_policies.find_one({"tenant_id": x_tenant_id, "status": "active"}, {"_id": 0, "rules": 1, "version": 1})
+    rows = list(db.approvals.find(t, {"_id": 0, "approval_id": 1, "active_dwell_ms": 1, "created_at": 1})
+                .sort("created_at", -1).limit(limit))
+    rows.reverse()  # oldest first, so the list reads as a time series
+    return clean({"reviewer_id": reviewer_id, "suspension": susp,
+                  "floor_ms": ((policy or {}).get("rules") or {}).get("min_active_dwell_ms"),
+                  "policy_version": (policy or {}).get("version"),
+                  "dwell": [{"approval_id": r["approval_id"], "active_dwell_ms": r.get("active_dwell_ms"),
+                             "at": r.get("created_at")} for r in rows]})
+
+
 @app.get("/api/examiner/cases/{case_id}")
 def examiner(case_id: str, x_tenant_id: str = Header(...)):
     return clean(rules.examiner(x_tenant_id, case_id))

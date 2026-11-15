@@ -15,6 +15,15 @@ jobs:
       - name: Secret scan
         run: |
           ! git grep -nE "(sk-ant-|sk-[A-Za-z0-9]{20,}|mongodb\+srv://[^<\"]+:[^<\"]+@)" -- . ':!*.md' ':!.env.example'
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: npm --prefix ui ci
+      - run: npx --prefix ui tsc --noEmit -p ui
+      - run: npm --prefix ui run build
   deploy:
     needs: [test]
     # Disabled by the combined plan (D17: no extra services). Remove `false &&` only if the team decides to deploy.
